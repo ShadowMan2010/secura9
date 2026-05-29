@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.env
+venv/
+.venv/
+facelock/
+core.*
+
+# Config & secrets
+raspberry-pi/firebase_adapter/serviceAccountKey.json
+**/serviceAccountKey.json
+*.local
+
+# Logs
+raspberry-pi/logs/
+*.log
+
+# Audio cache
+raspberry-pi/sounds/_tts_cache/
+raspberry-pi/sounds/*.wav
+raspberry-pi/sounds/*.mp3
+!raspberry-pi/sounds/approve.mp3
+!raspberry-pi/sounds/deny.mp3
+!raspberry-pi/sounds/welcome.wav
+
+# Android
+secura9-android/.gradle/
+secura9-android/build/
+secura9-android/app/build/
+secura9-android/local.properties
+secura9-android/.idea/
+secura9-android/app/google-services.json
+*.iml
+
+# Node / Dashboard
+dashboard/node_modules/
+dashboard/.firebase/
+dashboard/firebase-debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

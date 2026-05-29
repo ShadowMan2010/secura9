@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SECURA-9 // WEB DECK</title>
+<link rel="icon" type="image/png" href="/logo-small.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #030810;
+  --panel: #070f1c;
+  --cyan: #00ffe5;
+  --green: #00ff88;
+  --red: #ff003c;
+  --yellow: #ffe600;
+  --dim: #0a1828;
+  --text: #b8ddf0;
+  --muted: #3a6080;
+  --mono: 'Share Tech Mono', monospace;
+  --display: 'Orbitron', sans-serif;
+  --body: 'Rajdhani', sans-serif;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--body); }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,229,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,229,0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0.1) 4px);
+  pointer-events: none; z-index: 9998;
+}
+
+.root { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
+
+/* ─── TOPBAR ─── */
+.topbar {
+  background: rgba(7,15,28,0.95);
+  border-bottom: 1px solid rgba(0,255,229,0.25);
+  padding: 0 24px;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: var(--display);
+  font-size: 14px; font-weight: 900;
+  letter-spacing: 5px; color: var(--cyan);
+  text-shadow: 0 0 16px rgba(0,255,229,0.4);
+}
+
+.topbar-center {
+  display: flex; gap: 6px; align-items: center;
+}
+
+.topbar-pill {
+  background: var(--dim);
+  border: 1px solid rgba(0,255,229,0.18);
+  padding: 4px 12px;
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 2px; color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+
+.pdot {
+  width: 6px; height: 6px; border-radius: 50%;
+}
+.pdot.green { background: var(--green); box-shadow: 0 0 5px var(--green); animation: blink 1.5s ease-in-out infinite; }
+.pdot.red   { background: var(--red); box-shadow: 0 0 5px var(--red); animation: blink 0.7s ease-in-out infinite; }
+.pdot.amber { background: var(--yellow); box-shadow: 0 0 5px var(--yellow); animation: blink 1s ease-in-out infinite; }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.topbar-right { display: flex; gap: 12px; align-items: center; }
+
+.clock {
+  font-family: var(--mono); font-size: 13px;
+  color: var(--cyan); letter-spacing: 3px;
+}
+
+/* ─── MAIN LAYOUT ─── */
+.dash-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1fr 300px;
+  grid-template-rows: 1fr;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* ─── LEFT SIDEBAR ─── */
+.sidebar {
+  border-right: 1px solid rgba(0,255,229,0.12);
+  background: rgba(7,15,28,0.6);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(0,255,229,0.3); }
+
+/* ─── CENTER ─── */
+.center-col {
+  display: flex; flex-direction: column;
+  padding: 16px;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.center-col::-webkit-scrollbar { width: 3px; }
+.center-col::-webkit-scrollbar-thumb { background: rgba(0,255,229,0.3); }
+
+/* ─── RIGHT SIDEBAR ─── */
+.right-sidebar {
+  border-left: 1px solid rgba(0,255,229,0.12);
+  background: rgba(7,15,28,0.6);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+
+/* ─── SECTION HEADER ─── */
+.sec-head {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.12);
+  font-family: var(--display); font-size: 8px;
+  letter-spacing: 3px; color: var(--muted); text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+
+.sec-head .badge {
+  background: rgba(255,0,60,0.15);
+  border: 1px solid rgba(255,0,60,0.4);
+  color: var(--red);
+  font-size: 9px; padding: 1px 6px;
+  border-radius: 1px; letter-spacing: 1px;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+.sec-head .badge.green {
+  background: rgba(0,255,136,0.1);
+  border-color: rgba(0,255,136,0.3);
+  color: var(--green);
+  animation: none;
+}
+
+/* ─── NOBODY HOME CONTROL ─── */
+.nobody-control {
+  padding: 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.1);
+}
+
+.nobody-title {
+  font-family: var(--display); font-size: 9px;
+  letter-spacing: 2px; color: var(--text); margin-bottom: 8px;
+}
+
+.nobody-desc {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 1px;
+  line-height: 1.6; margin-bottom: 12px;
+}
+
+.toggle-row { display: flex; align-items: center; gap: 12px; }
+
+.toggle {
+  position: relative; width: 54px; height: 26px; cursor: pointer; flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.tslider {
+  position: absolute; inset: 0;
+  background: var(--dim);
+  border: 1px solid var(--muted);
+  transition: all 0.3s;
+}
+.tslider::before {
+  content: '';
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px;
+  background: var(--muted);
+  transition: all 0.3s;
+}
+.toggle input:checked + .tslider { background: rgba(255,0,60,0.12); border-color: var(--red); }
+.toggle input:checked + .tslider::before { transform: translateX(28px); background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+.toggle-state {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+}
+.toggle-state.off { color: var(--muted); }
+.toggle-state.on  { color: var(--red); animation: blink 1.5s ease-in-out infinite; }
+
+/* ─── DISPLAY STATE ─── */
+.disp-state-card {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.1);
+}
+
+.ds-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.ds-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+.ds-val   { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; }
+.ds-val.ok { color: var(--green); }
+.ds-val.warn { color: var(--yellow); }
+.ds-val.err  { color: var(--red); }
+
+/* ─── STATS GRID ─── */
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.1);
+}
+
+.stat-cell {
+  background: var(--dim);
+  border: 1px solid rgba(0,255,229,0.1);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.stat-num {
+  font-family: var(--display); font-size: 22px; font-weight: 900;
+  color: var(--cyan); line-height: 1;
+}
+.stat-num.red { color: var(--red); }
+.stat-num.green { color: var(--green); }
+.stat-num.amber { color: var(--yellow); }
+
+.stat-lbl {
+  font-family: var(--mono); font-size: 7px;
+  color: var(--muted); letter-spacing: 1.5px;
+  margin-top: 4px; text-transform: uppercase;
+}
+
+/* ─── KNOWN FACES ─── */
+.face-list { padding: 10px 14px; flex: 1; }
+
+.face-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0,255,229,0.1);
+  margin-bottom: 6px;
+  background: var(--dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.face-item:hover { border-color: rgba(0,255,229,0.3); background: rgba(0,255,229,0.04); }
+
+.face-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 11px; font-weight: 700;
+  border: 1px solid; flex-shrink: 0;
+}
+
+.face-info { flex: 1; }
+.face-name { font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--text); }
+.face-meta { font-family: var(--mono); font-size: 8px; color: var(--muted); letter-spacing: 1px; margin-top: 2px; }
+
+.face-remove {
+  background: transparent; border: 1px solid rgba(255,0,60,0.3);
+  color: rgba(255,0,60,0.6); font-size: 11px;
+  width: 24px; height: 24px;
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.face-remove:hover { background: rgba(255,0,60,0.1); color: var(--red); }
+
+.add-face-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed rgba(0,255,229,0.2);
+  color: var(--muted);
+  font-family: var(--mono); font-size: 9px;
+  padding: 8px; letter-spacing: 2px; cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+.add-face-btn:hover { border-color: rgba(0,255,229,0.5); color: var(--cyan); }
+
+/* ─── APPROVAL QUEUE (CENTER) ─── */
+.queue-header {
+  font-family: var(--display); font-size: 8px;
+  letter-spacing: 3px; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 4px;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ─── CAMERA FEED ─── */
+.camera-panel {
+  background: #000; position: relative; overflow: hidden;
+  border: 1px solid rgba(0,255,229,0.15); margin-bottom: 4px;
+  aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; min-height: 180px;
+}
+.camera-panel video {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+}
+.cam-placeholder {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  letter-spacing: 2px; text-align: center;
+}
+.cam-placeholder .icon { font-size: 32px; opacity: 0.3; margin-bottom: 8px; }
+.cam-status {
+  position: absolute; top: 6px; right: 8px;
+  font-family: var(--mono); font-size: 7px; letter-spacing: 1px;
+  padding: 2px 8px; border-radius: 2px;
+}
+.cam-status.live { background: rgba(0,255,136,0.15); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+.cam-status.off { background: rgba(255,0,60,0.15); color: var(--red); border: 1px solid rgba(255,0,60,0.3); }
+.cam-status.connecting { background: rgba(255,230,0,0.15); color: var(--yellow); border: 1px solid rgba(255,230,0,0.3); }
+
+.talk-btn {
+  position: absolute; bottom: 8px; right: 8px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  padding: 4px 12px; border-radius: 2px; cursor: pointer;
+  background: rgba(0,255,229,0.1); color: var(--cyan);
+  border: 1px solid rgba(0,255,229,0.3);
+  transition: all 0.2s; z-index: 10;
+}
+.talk-btn:hover:not(:disabled) { background: rgba(0,255,229,0.25); }
+.talk-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.talk-btn.active { background: rgba(0,255,136,0.2); color: var(--green); border-color: var(--green); }
+.talk-btn.active:hover { background: rgba(0,255,136,0.35); }
+
+.queue-empty {
+  text-align: center; padding: 40px 20px;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--muted); letter-spacing: 2px;
+}
+
+.approval-card {
+  background: var(--panel);
+  border: 1px solid rgba(255,0,60,0.4);
+  position: relative; overflow: hidden;
+  animation: cardSlide .3s ease-out;
+}
+@keyframes cardSlide { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+
+.approval-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
+  animation: sweep 2s ease-in-out infinite;
+}
+@keyframes sweep { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+.ac-header {
+  background: rgba(255,0,60,0.08);
+  border-bottom: 1px solid rgba(255,0,60,0.2);
+  padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.ac-alert-label {
+  font-family: var(--display); font-size: 9px;
+  letter-spacing: 3px; color: var(--red); text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.ac-time {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 1px;
+}
+
+.ac-body {
+  display: flex; gap: 16px; padding: 14px;
+}
+
+.ac-image {
+  width: 120px; height: 140px; flex-shrink: 0;
+  background: var(--dim);
+  border: 1px solid rgba(255,0,60,0.3);
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.ac-image img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+.ac-image-placeholder {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; opacity: 0.5;
+}
+
+.ac-details { flex: 1; }
+
+.ac-name-label {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 2px; margin-bottom: 4px;
+}
+
+.ac-name-val {
+  font-family: var(--display); font-size: 20px; font-weight: 900;
+  color: var(--yellow); letter-spacing: 2px; margin-bottom: 12px;
+}
+
+.ac-meta-row {
+  display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px;
+}
+
+.ac-meta-line {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 1px;
+  display: flex; gap: 8px;
+}
+.ac-meta-line span { color: var(--text); }
+
+.ac-edit-row {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 14px;
+}
+
+.ac-name-input {
+  flex: 1;
+  background: var(--dim);
+  border: 1px solid rgba(0,255,229,0.2);
+  color: var(--text);
+  font-family: var(--mono); font-size: 11px;
+  padding: 6px 10px; letter-spacing: 1px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ac-name-input:focus { border-color: var(--cyan); }
+.ac-name-input::placeholder { color: var(--muted); }
+
+.ac-edit-label {
+  font-family: var(--mono); font-size: 8px;
+  color: var(--muted); letter-spacing: 1px;
+}
+
+.ac-buttons {
+  display: flex; gap: 10px;
+}
+
+.btn-approve, .btn-deny {
+  flex: 1;
+  font-family: var(--display); font-size: 9px;
+  padding: 10px 16px; cursor: pointer;
+  letter-spacing: 3px; transition: all 0.18s;
+  text-transform: uppercase;
+}
+.btn-approve:disabled, .btn-deny:disabled { opacity: .35; cursor: not-allowed; }
+
+.btn-approve {
+  background: rgba(0,255,136,0.08);
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+.btn-approve:hover:not(:disabled) { background: rgba(0,255,136,0.18); box-shadow: 0 0 16px rgba(0,255,136,0.25); }
+
+.btn-deny {
+  background: rgba(255,0,60,0.08);
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+.btn-deny:hover:not(:disabled) { background: rgba(255,0,60,0.18); box-shadow: 0 0 16px rgba(255,0,60,0.25); }
+
+/* ─── ACCESS LOG ─── */
+.log-panel { flex: 1; }
+
+.log-entry {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.05);
+  transition: background 0.15s;
+}
+.log-entry:hover { background: rgba(0,255,229,0.03); }
+
+.log-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  font-family: var(--display);
+}
+
+.log-info { flex: 1; }
+.log-name { font-family: var(--body); font-size: 12px; font-weight: 600; color: var(--text); }
+.log-detail { font-family: var(--mono); font-size: 8px; color: var(--muted); letter-spacing: 1px; margin-top: 1px; }
+
+.log-badge {
+  font-family: var(--mono); font-size: 8px;
+  padding: 2px 6px; border: 1px solid; letter-spacing: 1px;
+}
+.log-badge.grant { color: var(--green); border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.07); }
+.log-badge.deny  { color: var(--red); border-color: rgba(255,0,60,0.3); background: rgba(255,0,60,0.07); }
+.log-badge.info  { color: var(--cyan); border-color: rgba(0,255,229,0.3); background: rgba(0,255,229,0.07); }
+.log-badge.warn  { color: var(--yellow); border-color: rgba(255,230,0,0.3); background: rgba(255,230,0,0.07); }
+
+/* ─── DEVICE STATUS (right sidebar) ─── */
+.dev-status-card {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.1);
+}
+
+/* ─── RECENT EVENTS ─── */
+.recent-empty {
+  padding: 20px; font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 1px; text-align: center;
+}
+
+/* ─── CONNECTION PANEL ─── */
+.conn-panel {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,255,229,0.1);
+}
+.conn-url-row {
+  display: flex; gap: 6px; margin-top: 6px;
+}
+.conn-input {
+  flex: 1; background: var(--dim);
+  border: 1px solid rgba(0,255,229,0.2);
+  color: var(--text); font-family: var(--mono);
+  font-size: 10px; padding: 5px 8px; outline: none;
+}
+.conn-input:focus { border-color: var(--cyan); }
+.conn-btn {
+  background: transparent; border: 1px solid;
+  font-family: var(--mono); font-size: 8px;
+  padding: 5px 10px; cursor: pointer;
+  letter-spacing: 2px; text-transform: uppercase;
+  transition: all .15s;
+}
+.conn-btn.cyan { border-color: var(--cyan); color: var(--cyan); }
+.conn-btn.cyan:hover { background: rgba(0,255,229,.1); }
+.conn-btn.red { border-color: var(--red); color: var(--red); }
+.conn-btn.red:hover { background: rgba(255,0,60,.1); }
+.conn-btn.green { border-color: var(--green); color: var(--green); }
+.conn-btn.green:hover { background: rgba(0,255,136,.1); }
+.conn-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+.conn-status-line {
+  font-family: var(--mono); font-size: 8px;
+  margin-top: 6px; display: flex; align-items: center; gap: 6px;
+}
+
+/* ─── TOAST ─── */
+.toast-wrap {
+  position: fixed; top: 60px; right: 20px;
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 999;
+}
+
+.toast {
+  background: var(--panel);
+  border: 1px solid;
+  padding: 10px 16px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+  animation: toastIn 0.3s ease-out;
+  max-width: 280px;
+}
+@keyframes toastIn { from{transform:translateX(20px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+.toast.ok   { border-color: var(--green); color: var(--green); }
+.toast.warn { border-color: var(--yellow); color: var(--yellow); }
+.toast.err  { border-color: var(--red); color: var(--red); }
+
+/* ─── CONFIRM DIALOG ─── */
+.confirm-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  display: none; align-items: center; justify-content: center;
+}
+.confirm-overlay.show { display: flex; }
+.confirm-box {
+  background: var(--panel);
+  border: 1px solid var(--cyan);
+  padding: 24px 28px;
+  width: 340px;
+}
+.confirm-title {
+  font-family: var(--display); font-size: 11px;
+  letter-spacing: 3px; color: var(--cyan); margin-bottom: 12px;
+}
+.confirm-msg {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--muted); letter-spacing: 1px; line-height: 1.7; margin-bottom: 18px;
+}
+.confirm-btns { display: flex; gap: 10px; }
+.confirm-ok {
+  flex: 1; background: rgba(255,0,60,0.08);
+  border: 1px solid var(--red); color: var(--red);
+  font-family: var(--mono); font-size: 10px; padding: 8px;
+  cursor: pointer; letter-spacing: 2px; transition: all 0.15s;
+}
+.confirm-ok:hover { background: rgba(255,0,60,0.18); }
+.confirm-cancel {
+  flex: 1; background: transparent;
+  border: 1px solid var(--muted); color: var(--muted);
+  font-family: var(--mono); font-size: 10px; padding: 8px;
+  cursor: pointer; letter-spacing: 2px; transition: all 0.15s;
+}
+.confirm-cancel:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ─── KEYBOARD HINT ─── */
+.kb-hint {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 7px;
+  color: var(--muted); letter-spacing: 1px;
+}
+
+/* ─── AUTH TABS ─── */
+.auth-tabs {
+  display: flex; gap: 0; margin-bottom: 24px;
+  border-bottom: 1px solid rgba(0,255,229,0.15);
+}
+.auth-tab {
+  flex: 1; padding: 10px 16px;
+  font-family: var(--display); font-size: 9px;
+  letter-spacing: 3px; cursor: pointer; text-align: center;
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); transition: all 0.2s;
+  text-transform: uppercase;
+}
+.auth-tab:hover { color: var(--text); }
+.auth-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.auth-tab.active .auth-tab-icon { opacity: 1; }
+.auth-tab-icon { opacity: 0.4; margin-right: 6px; }
+.auth-sub {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 1px; margin-bottom: 20px;
+  text-align: center;
+}
+.auth-features {
+  display: flex; flex-direction: column; gap: 8px; margin: 16px 0;
+  text-align: left;
+}
+.auth-feat-row {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 9px; color: var(--text); letter-spacing: 1px;
+}
+.auth-feat-icon {
+  width: 20px; text-align: center; color: var(--cyan);
+}
+
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+<div class="root">
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;">
+  <div style="margin-bottom:20px;"><img src="/logo-small.png" style="width:80px;height:80px;"></div>
+  <div style="font-family:var(--display);font-size:28px;font-weight:900;letter-spacing:8px;color:var(--cyan);text-shadow:0 0 30px rgba(0,255,229,0.3);margin-bottom:4px;">SECURA-9</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:3px;margin-bottom:28px;">AUTHORIZED PERSONNEL ONLY</div>
+
+  <!-- Auth Tabs -->
+  <div style="width:340px;">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="authTabSignup" onclick="switchAuthTab('signup')">
+        <span class="auth-tab-icon">✦</span> SIGN UP
+      </button>
+      <button class="auth-tab" id="authTabSignin" onclick="switchAuthTab('signin')">
+        <span class="auth-tab-icon">◈</span> SIGN IN
+      </button>
+    </div>
+  </div>
+
+  <!-- Sign Up Panel -->
+  <div id="authPanelSignup" style="width:340px;text-align:center;">
+    <div class="auth-sub">Create your SECURA-9 operator account</div>
+    <div class="auth-features">
+      <div class="auth-feat-row"><span class="auth-feat-icon">✓</span> Real-time approval queue from any device</div>
+      <div class="auth-feat-row"><span class="auth-feat-icon">✓</span> Live camera view &amp; two-way talk</div>
+      <div class="auth-feat-row"><span class="auth-feat-icon">✓</span> Same account on phone + laptop</div>
+    </div>
+    <button id="signupBtn" style="background:transparent;border:1px solid var(--cyan);color:var(--cyan);padding:10px 28px;font-family:var(--display);font-size:10px;font-weight:700;letter-spacing:3px;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:10px;margin-top:8px;" onmouseover="this.style.background='rgba(0,255,229,0.1)'" onmouseout="this.style.background='transparent'" onclick="handleSignup()">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      SIGN UP WITH GOOGLE
+    </button>
+  </div>
+
+  <!-- Sign In Panel -->
+  <div id="authPanelSignin" style="width:340px;text-align:center;display:none;">
+    <div class="auth-sub">Welcome back — sign in with your Google account</div>
+    <div style="margin:8px 0 4px;text-align:center;font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;">
+      Same account = same approvals, camera, and controls across all your devices
+    </div>
+    <button id="signinBtn" style="background:transparent;border:1px solid var(--green);color:var(--green);padding:10px 28px;font-family:var(--display);font-size:10px;font-weight:700;letter-spacing:3px;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:10px;margin-top:12px;" onmouseover="this.style.background='rgba(0,255,136,0.1)'" onmouseout="this.style.background='transparent'" onclick="handleSignin()">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      SIGN IN WITH GOOGLE
+    </button>
+  </div>
+
+  <div id="loginError" style="font-family:var(--mono);font-size:9px;color:var(--red);margin-top:16px;display:none;"></div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo"><img src="/logo-small.png" style="height:28px;vertical-align:middle;margin-right:8px">SECURA-9 WEB DECK</div>
+  <div class="topbar-center">
+    <div class="topbar-pill">
+      <span style="font-size:8px;color:var(--muted)">FB</span>
+      <div class="pdot gray" id="fbDot"></div>
+      <span id="fbLabel">INIT</span>
+    </div>
+    <div class="topbar-pill">
+      <span style="font-size:8px;color:var(--muted)">PI</span>
+      <div class="pdot gray" id="piDot"></div>
+      <span id="piLabel">OFFLINE</span>
+    </div>
+    <div class="topbar-pill">
+      <div class="pdot amber" id="pendDot"></div>
+      <span id="pendLabel">PENDING: 0</span>
+    </div>
+  </div>
+  <div class="topbar-right" style="gap:8px">
+    <div class="topbar-pill" id="userPill" style="display:none;gap:6px;padding:3px 12px;">
+      <img id="userAvatar" src="" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--cyan);display:none;">
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <span id="userName" style="font-family:var(--mono);font-size:9px;color:var(--cyan);letter-spacing:1px;"></span>
+        <span id="userEmail" style="font-family:var(--mono);font-size:7px;color:var(--muted);"></span>
+      </div>
+      <button onclick="handleLogout()" style="background:transparent;border:1px solid var(--red);color:var(--red);padding:1px 6px;font-family:var(--mono);font-size:7px;cursor:pointer;letter-spacing:1px;border-radius:2px;">EXIT</button>
+    </div>
+    <div class="clock" id="dbClock">--:--:--</div>
+  </div>
+</div>
+
+<!-- MAIN 3-COL LAYOUT -->
+<div class="dash-main" id="dashContent" style="display:none">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+    <div class="sec-head">⬡ Connection</div>
+    <div class="conn-panel">
+      <div style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px">Firebase Hosting</div>
+      <div class="conn-status-line">
+        <div class="pdot gray" id="connDot"></div>
+        <span id="connStatus">Initializing...</span>
+      </div>
+    </div>
+
+    <div class="sec-head">⬡ Display State</div>
+    <div class="dev-status-card">
+      <div class="ds-row">
+        <span class="ds-label">STATE</span>
+        <span class="ds-val off" id="dsDispState">--</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">DOOR</span>
+        <span class="ds-val off" id="dsDispDoor">--</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">FACE</span>
+        <span class="ds-val off" id="dsDispFace">--</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">MOTION</span>
+        <span class="ds-val off" id="dsDispMotion">--</span>
+      </div>
+    </div>
+
+    <div class="sec-head">⬡ Nobody Home</div>
+    <div class="nobody-control">
+      <div class="nobody-title">NOBODY HOME MODE</div>
+      <div class="nobody-desc">
+        When active, known faces require Telegram approval. Unknown faces get OTP.
+      </div>
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="nobodyToggle" onchange="toggleNobody()">
+          <div class="tslider"></div>
+        </label>
+        <div class="toggle-state off" id="nobodyStateLabel">INACTIVE</div>
+      </div>
+    </div>
+
+    <div class="sec-head">⬡ Statistics</div>
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-num green" id="statGranted">0</div>
+        <div class="stat-lbl">Granted Today</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num red" id="statDenied">0</div>
+        <div class="stat-lbl">Denied Today</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num amber" id="statPending">0</div>
+        <div class="stat-lbl">Pending</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num" id="statKnown">0</div>
+        <div class="stat-lbl">Known Faces</div>
+      </div>
+    </div>
+
+    <div class="sec-head">⬡ Known Identities <span class="badge green" id="knownBadge">0</span></div>
+    <div class="face-list" id="faceList"></div>
+    <div style="padding:0 14px 14px">
+      <button class="add-face-btn" onclick="addFaceManually()">+ ADD FACE MANUALLY</button>
+    </div>
+  </div>
+
+  <!-- CENTER COL -->
+  <div class="center-col">
+    <!-- Camera Feed -->
+    <div class="camera-panel">
+      <video id="camFeed" autoplay playsinline muted style="display:none"></video>
+      <div class="cam-placeholder" id="camPlaceholder">
+        <div class="icon">📷</div>
+        <div id="camLabel">CONNECTING TO CAMERA...</div>
+      </div>
+      <div class="cam-status off" id="camStatus">OFF</div>
+      <button class="talk-btn" id="talkBtn" onclick="toggleTalkback()" disabled title="Two-way talk">🎤 TALK</button>
+    </div>
+
+    <div class="queue-header">
+      ⬡ Approval Queue
+      <span class="badge red" id="queueBadge" style="display:none">PENDING</span>
+      <span class="kb-hint">Ctrl+Enter ✓ &nbsp; Ctrl+Del ✗</span>
+    </div>
+    <div id="queueContainer">
+      <div class="queue-empty" id="queueEmpty">
+        <div style="font-size:28px;margin-bottom:10px;opacity:0.3">👁</div>
+        <div>NO PENDING APPROVALS</div>
+        <div style="margin-top:6px;font-size:8px">Waiting for Raspberry Pi to detect new faces...</div>
+      </div>
+    </div>
+
+    <div style="font-family:var(--display);font-size:8px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-top:4px">⬡ Live Access Log</div>
+    <div style="background:var(--panel);border:1px solid rgba(0,255,229,0.15);flex:1" id="accessLog">
+      <div class="log-entry">
+        <div class="log-avatar" style="background:rgba(0,255,229,0.1);border:1px solid rgba(0,255,229,0.3);color:var(--cyan)">S9</div>
+        <div class="log-info">
+          <div class="log-name">Web Deck Initialized</div>
+          <div class="log-detail">Ready via Firebase</div>
+        </div>
+        <div class="log-badge info">INFO</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR -->
+  <div class="right-sidebar">
+    <div class="sec-head">⬡ Pi Status</div>
+    <div class="dev-status-card">
+      <div class="ds-row">
+        <span class="ds-label">CONNECTION</span>
+        <span class="ds-val off" id="dsConn">OFFLINE</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">CAMERA</span>
+        <span class="ds-val off" id="dsCam">--</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">FACE ENGINE</span>
+        <span class="ds-val off" id="dsEngine">--</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">DOOR LOCK</span>
+        <span class="ds-val off" id="dsDoor">--</span>
+      </div>
+      <div class="ds-row">
+        <span class="ds-label">LAST SEEN</span>
+        <span class="ds-val" id="dsLastSeen" style="color:var(--muted)">Never</span>
+      </div>
+    </div>
+
+    <div class="sec-head">⬡ Quick Test Tools</div>
+    <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;margin-bottom:4px">
+        Simulate Pi events for testing:
+      </div>
+      <button class="add-face-btn" style="text-align:left;border-style:solid;border-color:rgba(0,255,136,0.25);color:var(--green)" onclick="simKnownFace()">
+        ▶ SIM: Known Face Detected
+      </button>
+      <button class="add-face-btn" style="text-align:left;border-style:solid;border-color:rgba(255,230,0,0.25);color:var(--yellow)" onclick="simNewFace()">
+        ▶ SIM: New Face (Approval Request)
+      </button>
+      <button class="add-face-btn" style="text-align:left;border-style:solid;border-color:rgba(255,0,60,0.25);color:var(--red)" onclick="simDenied()">
+        ▶ SIM: Unauthorized Attempt
+      </button>
+      <button class="add-face-btn" style="text-align:left;border-style:solid;border-color:rgba(0,255,229,0.25);color:var(--cyan)" onclick="requestPiStatus()">
+        ↻ REFRESH PI STATUS
+      </button>
+    </div>
+
+    <div class="sec-head">⬡ Recent Events</div>
+    <div id="recentEvents" style="flex:1">
+      <div class="recent-empty">No recent events</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- Confirm dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirmTitle">CONFIRM ACTION</div>
+    <div class="confirm-msg" id="confirmMsg">Are you sure?</div>
+    <div class="confirm-btns">
+      <button class="confirm-ok" id="confirmOkBtn">CONFIRM</button>
+      <button class="confirm-cancel" onclick="hideConfirm()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── FIREBASE CONFIG ─────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDKatCe2fBRIY5Jhp3aArNSAUshZTHSORc",
+  authDomain: "secura9-pi-security-system.firebaseapp.com",
+  projectId: "secura9-pi-security-system",
+  storageBucket: "secura9-pi-security-system.firebasestorage.app",
+  messagingSenderId: "355487120144",
+  appId: "1:355487120144:web:b557aadc3bbf1d881f4395",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+const DEVICE_ID = 'secura9_pi_01';
+let currentUser = null;
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────
+let authMode = 'signup'; // 'signup' | 'signin'
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('authTabSignup').className = 'auth-tab' + (mode === 'signup' ? ' active' : '');
+  document.getElementById('authTabSignin').className = 'auth-tab' + (mode === 'signin' ? ' active' : '');
+  document.getElementById('authPanelSignup').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('authPanelSignin').style.display = mode === 'signin' ? 'block' : 'none';
+  document.getElementById('loginError').style.display = 'none';
+}
+
+async function _doGoogleAuth(isSignup) {
+  const el = document.getElementById('loginError');
+  el.style.display = 'none';
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    const result = await auth.signInWithPopup(provider);
+    if (isSignup && result.user) {
+      // Create user profile on first sign-up
+      await db.collection('users').doc(result.user.uid).set({
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastSignIn: firebase.firestore.FieldValue.serverTimestamp(),
+        devices: firebase.firestore.FieldValue.arrayUnion(DEVICE_ID),
+        role: 'operator',
+      }, { merge: true });
+    } else if (result.user) {
+      // Update last sign-in for returning users
+      await db.collection('users').doc(result.user.uid).set({
+        lastSignIn: firebase.firestore.FieldValue.serverTimestamp(),
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        devices: firebase.firestore.FieldValue.arrayUnion(DEVICE_ID),
+      }, { merge: true });
+    }
+  } catch (err) {
+    el.textContent = err.message;
+    el.style.display = 'block';
+  }
+}
+
+function handleSignup() { _doGoogleAuth(true); }
+function handleSignin() { _doGoogleAuth(false); }
+
+function handleLogout() {
+  stopWebRTCViewer();
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(user => {
+  const overlay = document.getElementById('loginOverlay');
+  const dashboard = document.getElementById('dashContent');
+  const userPill = document.getElementById('userPill');
+  if (user) {
+    currentUser = user;
+    overlay.style.display = 'none';
+    if (dashboard) dashboard.style.display = '';
+    if (userPill) userPill.style.display = 'flex';
+    document.getElementById('userName').textContent = user.displayName || user.email;
+    document.getElementById('userEmail').textContent = user.email;
+    const avatar = document.getElementById('userAvatar');
+    if (user.photoURL) {
+      avatar.src = user.photoURL;
+      avatar.style.display = 'block';
+    }
+    initFirebaseListeners();
+  } else {
+    currentUser = null;
+    overlay.style.display = 'flex';
+    if (dashboard) dashboard.style.display = 'none';
+    if (userPill) userPill.style.display = 'none';
+  }
+});
+
+// ─── STATE ───────────────────────────────────────────────────────────────
+let fbReady = false;
+let piOnline = false;
+let nobodyActive = false;
+let pendingQueue = [];
+let stats = { granted: 0, denied: 0 };
+const COLORS = ['#00ffe5','#00ff88','#ffe600','#ff6ec7','#a78bfa'];
+let listenersInitialized = false;
+
+// ─── CLOCK ───────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('dbClock').textContent =
+    new Date().toLocaleTimeString('en-IN', {hour12:false});
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ─── FIREBASE ────────────────────────────────────────────────────────────
+function setFbUI(ready) {
+  const dot = document.getElementById('fbDot');
+  const lbl = document.getElementById('fbLabel');
+  if (ready) {
+    dot.className = 'pdot green';
+    lbl.textContent = 'LIVE';
+    setConnStatus('Firebase connected', 'ok');
+  } else {
+    dot.className = 'pdot gray';
+    lbl.textContent = 'ERROR';
+    setConnStatus('Firebase disconnected', 'err');
+  }
+}
+
+function setConnStatus(txt, cls) {
+  const dot = document.getElementById('connDot');
+  const st  = document.getElementById('connStatus');
+  st.textContent = txt;
+  if (dot) dot.className = 'pdot ' + (cls === 'ok' ? 'green' : cls === 'warn' ? 'amber' : cls === 'err' ? 'red' : 'gray');
+}
+
+// ─── DISPLAY STATE HELPERS ───────────────────────────────────────────────
+function setDs(id, txt, cls) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = txt; el.className = 'ds-val ' + cls; }
+}
+
+// ─── FIREBASE LISTENERS ───────────────────────────────────────────────────
+function initFirebaseListeners() {
+  if (listenersInitialized) return;
+  listenersInitialized = true;
+  const devRef = db.collection('devices').doc(DEVICE_ID);
+
+  // Listen to status/live
+  devRef.collection('status').doc('live').onSnapshot(snap => {
+    if (!snap.exists) { setPiUI(false); return; }
+    const d = snap.data();
+    piOnline = true;
+    setPiUI(true);
+    document.getElementById('dsLastSeen').textContent =
+      new Date().toLocaleTimeString('en-IN', {hour12:false});
+    document.getElementById('dsLastSeen').style.color = 'var(--cyan)';
+    setDs('dsConn',  'ONLINE',  'ok');
+    setDs('dsCam',   d.camera  ? 'ACTIVE' : 'ERROR', d.camera  ? 'ok' : 'err');
+    setDs('dsEngine',d.engine  ? 'RUNNING': 'IDLE',  d.engine  ? 'ok' : 'warn');
+    setDs('dsDoor',  d.doorLocked ? 'LOCKED' : 'UNLOCKED', d.doorLocked ? 'ok' : 'warn');
+    setDs('dsDispState', d.displayState || '--', d.displayState === 'IDLE' ? 'ok' : 'warn');
+    setDs('dsDispDoor',  d.doorLocked ? 'LOCKED' : 'UNLOCKED', d.doorLocked ? 'ok' : 'warn');
+    setDs('dsDispFace',  d.faceDetected ? 'YES' : '--', d.faceDetected ? 'ok' : 'off');
+    setDs('dsDispMotion', d.motion ? 'YES' : 'NO', d.motion ? 'warn' : 'off');
+    // Nobody home state from Firestore
+    if (d.nobodyHome !== undefined) {
+      nobodyActive = d.nobodyHome;
+      document.getElementById('nobodyToggle').checked = nobodyActive;
+      document.getElementById('nobodyStateLabel').textContent = nobodyActive ? 'ACTIVE' : 'INACTIVE';
+      document.getElementById('nobodyStateLabel').className = 'toggle-state ' + (nobodyActive ? 'on' : 'off');
+    }
+    addLog('Status update from Pi', 'SYS', 'info');
+  });
+
+  // Listen to approvals collection for new face requests
+  devRef.collection('approvals').orderBy('timestamp', 'asc').onSnapshot(snap => {
+    snap.docChanges().forEach(change => {
+      const d = change.doc.data();
+      const id = change.doc.id;
+      const req = {
+        id: id,
+        name: d.name || 'Unknown',
+        image: d.imageB64 ? 'data:image/jpeg;base64,' + d.imageB64 : null,
+        timestamp: (d.timestamp && d.timestamp.toMillis) ? d.timestamp.toMillis() : Date.now(),
+        status: d.status || 'pending',
+        confidence: d.confidence || 0,
+      };
+      if (change.type === 'added') {
+        if (pendingQueue.find(r => r.id === id)) return;
+        pendingQueue.unshift(req);
+        renderQueue();
+        if (req.status === 'pending') {
+          addLog('New face request: ' + req.name, '?', 'warn');
+          addRecentEvent('⚠ New face: ' + req.name, 'amber');
+          showToast('New approval request: ' + req.name, 'warn');
+        }
+        checkPendingAndRing();
+      } else if (change.type === 'modified') {
+        const existing = pendingQueue.find(r => r.id === id);
+        if (existing) {
+          existing.status = req.status;
+          existing.name = req.name;
+          renderQueue();
+          checkPendingAndRing();
+        }
+      } else if (change.type === 'removed') {
+        const idx = pendingQueue.findIndex(r => r.id === id);
+        if (idx >= 0) {
+          pendingQueue.splice(idx, 1);
+          renderQueue();
+          checkPendingAndRing();
+        }
+      }
+    });
+  });
+
+  // Listen to notifications
+  devRef.collection('notifications').orderBy('timestamp', 'desc').limit(1).onSnapshot(snap => {
+    snap.docChanges().forEach(change => {
+      if (change.type === 'added') {
+        const d = change.doc.data();
+        if (d.type === 'access' && d.title && d.title.includes('Granted')) {
+          stats.granted++;
+          document.getElementById('statGranted').textContent = stats.granted;
+          addLog('Access granted: ' + (d.data?.name || 'unknown'), d.data?.name || '?', 'grant');
+          addRecentEvent('✓ Entered: ' + (d.data?.name || 'unknown'), 'green');
+        }
+      }
+    });
+  });
+
+  setFbUI(true);
+  setConnStatus('Firebase connected — listening', 'ok');
+  addLog('Firebase listeners initialized', 'SYS', 'info');
+
+  // Start WebRTC camera viewer after Firebase is ready
+  setTimeout(startWebRTCViewer, 1000);
+}
+
+// ─── WEBRTC VIEWER (Firebase signaling) ──────────────────────────────────
+const STUN_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+let webrtcPC = null;
+let webrtcSessionId = null;
+let webrtcUnsub = null;
+let webrtcIceUnsub = null;
+let localMicStream = null;
+let talkActive = false;
+let micReady = false;
+let webrtcConnected = false;
+
+function startWebRTCViewer() {
+  const video = document.getElementById('camFeed');
+  const placeholder = document.getElementById('camPlaceholder');
+  const status = document.getElementById('camStatus');
+  const label = document.getElementById('camLabel');
+  const talkBtn = document.getElementById('talkBtn');
+
+  setCamStatus('connecting', 'CONNECTING...');
+
+  webrtcSessionId = 'viewer_' + Date.now();
+  webrtcPC = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+
+  webrtcPC.addTransceiver('video', { direction: 'recvonly' });
+
+  // Set up audio (send to Pi for talkback)
+  const audioTransceiver = webrtcPC.addTransceiver('audio', { direction: 'sendrecv' });
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      localMicStream = stream;
+      stream.getAudioTracks().forEach(t => t.enabled = false);
+      const [micTrack] = stream.getAudioTracks();
+      if (micTrack) {
+        audioTransceiver.sender.replaceTrack(micTrack);
+        micReady = true;
+        updateTalkBtn();
+        addLog('Mic ready — talkback available', 'CAM', 'info');
+      }
+    })
+    .catch(() => {
+      addLog('No mic access — talkback disabled', 'CAM', 'warn');
+    });
+
+  function updateTalkBtn() {
+    talkBtn.disabled = !(micReady && webrtcConnected);
+  }
+
+  webrtcPC.ontrack = (event) => {
+    if (event.track.kind === 'video') {
+      video.srcObject = event.streams[0];
+      video.style.display = 'block';
+      placeholder.style.display = 'none';
+      setCamStatus('live', 'LIVE');
+      addLog('Camera feed connected', 'CAM', 'info');
+    }
+  };
+
+  webrtcPC.oniceconnectionstatechange = () => {
+    const s = webrtcPC.iceConnectionState;
+    if (s === 'connected' || s === 'completed') {
+      webrtcConnected = true;
+      updateTalkBtn();
+      setCamStatus('live', 'LIVE');
+    } else if (s === 'failed' || s === 'disconnected') {
+      webrtcConnected = false;
+      talkActive = false;
+      updateTalkBtn();
+      const btn = document.getElementById('talkBtn');
+      if (btn) btn.classList.remove('active');
+      setCamStatus('off', 'OFF');
+      video.style.display = 'none';
+      placeholder.style.display = 'flex';
+    }
+  };
+
+  webrtcPC.onicecandidate = (event) => {
+    if (!event.candidate || !webrtcSessionId) return;
+    db.collection('devices').doc(DEVICE_ID)
+      .collection('webrtc').doc(webrtcSessionId)
+      .collection('viewerIce').add({
+        candidate: {
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex,
+        },
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+  };
+
+  // Create offer
+  webrtcPC.createOffer()
+    .then(offer => webrtcPC.setLocalDescription(offer))
+    .then(() => {
+      const ref = db.collection('devices').doc(DEVICE_ID)
+        .collection('webrtc').doc(webrtcSessionId);
+      return ref.set({
+        offer: {
+          type: webrtcPC.localDescription.type,
+          sdp: webrtcPC.localDescription.sdp,
+        },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    })
+    .then(() => {
+      // Listen for answer and Pi ICE candidates
+      const ref = db.collection('devices').doc(DEVICE_ID)
+        .collection('webrtc').doc(webrtcSessionId);
+      webrtcUnsub = ref.onSnapshot(async (snap) => {
+        const data = snap.data();
+        if (!data) return;
+
+        // Got answer from Pi
+        if (data.answer && webrtcPC && !webrtcPC.currentRemoteDescription) {
+          await webrtcPC.setRemoteDescription(new RTCSessionDescription(data.answer));
+          addLog('WebRTC answer received', 'CAM', 'info');
+        }
+
+        // Start listening for Pi ICE candidates (continuous)
+        const seenIce = new Set();
+        webrtcIceUnsub = ref.collection('piIce').orderBy('timestamp').onSnapshot(iceSnap => {
+          iceSnap.docChanges().forEach(change => {
+            if (change.type !== 'added') return;
+            const id = change.doc.id;
+            if (seenIce.has(id)) return;
+            seenIce.add(id);
+            const c = change.doc.data().candidate;
+            if (c && webrtcPC && webrtcPC.remoteDescription) {
+              webrtcPC.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+            }
+          });
+        });
+      });
+
+      addLog('WebRTC offer sent — waiting for Pi', 'CAM', 'info');
+      setCamStatus('connecting', 'WAITING FOR PI...');
+    })
+    .catch(err => {
+      setCamStatus('off', 'ERROR');
+      label.textContent = 'CAMERA ERROR';
+      console.error('WebRTC error:', err);
+    });
+}
+
+function stopWebRTCViewer() {
+  if (webrtcIceUnsub) { webrtcIceUnsub(); webrtcIceUnsub = null; }
+  if (webrtcUnsub) { webrtcUnsub(); webrtcUnsub = null; }
+  if (webrtcPC) { webrtcPC.close(); webrtcPC = null; }
+  if (localMicStream) {
+    localMicStream.getAudioTracks().forEach(t => t.stop());
+    localMicStream = null;
+  }
+  micReady = false;
+  webrtcConnected = false;
+  talkActive = false;
+  const talkBtn = document.getElementById('talkBtn');
+  if (talkBtn) { talkBtn.disabled = true; talkBtn.classList.remove('active'); talkBtn.textContent = '🎤 TALK'; }
+  const video = document.getElementById('camFeed');
+  if (video) { video.srcObject = null; video.style.display = 'none'; }
+  setCamStatus('off', 'OFF');
+}
+
+function toggleTalkback() {
+  const btn = document.getElementById('talkBtn');
+  if (!localMicStream || !webrtcPC) return;
+  talkActive = !talkActive;
+  localMicStream.getAudioTracks().forEach(t => t.enabled = talkActive);
+  if (talkActive) {
+    btn.classList.add('active');
+    btn.textContent = '🎤 TALK: ON';
+    addLog('Talkback ON', 'CAM', 'info');
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🎤 TALK';
+    addLog('Talkback OFF', 'CAM', 'info');
+  }
+}
+
+function setCamStatus(cls, text) {
+  const status = document.getElementById('camStatus');
+  const label = document.getElementById('camLabel');
+  if (status) { status.className = 'cam-status ' + cls; status.textContent = text; }
+  if (label && cls !== 'live') label.textContent = text;
+}
+
+// ─── APPROVAL RING (continuous like Google Meet) ─────────────────────────
+let approvalAudio = null;
+
+function playNotify() {
+  playApprovalChimeOnce();
+}
+
+function playApprovalChimeOnce() {
+  try {
+    const a = new Audio('/approval_chime.mp3');
+    a.volume = 0.5;
+    a.play().catch(() => {});
+  } catch(e) {}
+}
+
+function startApprovalRing() {
+  if (approvalAudio) return;
+  try {
+    approvalAudio = new Audio('/approval_chime.mp3');
+    approvalAudio.loop = true;
+    approvalAudio.volume = 0.4;
+    approvalAudio.play().catch(() => {});
+  } catch(e) {}
+}
+
+function stopApprovalRing() {
+  if (approvalAudio) {
+    approvalAudio.pause();
+    approvalAudio.currentTime = 0;
+    approvalAudio = null;
+  }
+}
+      osc.frequency.setValueAtTime(640, t + 0.12);
+      gain.gain.setValueAtTime(0.2, t);
+function checkPendingAndRing() {
+  const pending = pendingQueue.filter(r => r.status === 'pending');
+  if (pending.length > 0) startApprovalRing();
+  else stopApprovalRing();
+}
+
+// ─── KNOWN FACES ─────────────────────────────────────────────────────────
+function getKnownFaces() {
+  try { return JSON.parse(localStorage.getItem('secura9_faces') || '[]'); } catch { return []; }
+}
+function saveKnownFaces(faces) {
+  localStorage.setItem('secura9_faces', JSON.stringify(faces));
+}
+
+function renderFaceList() {
+  const faces = getKnownFaces();
+  const list = document.getElementById('faceList');
+  document.getElementById('knownBadge').textContent = faces.length;
+  document.getElementById('statKnown').textContent = faces.length;
+
+  list.innerHTML = faces.length === 0
+    ? '<div class="recent-empty">No known faces yet</div>'
+    : '';
+
+  faces.forEach((f, i) => {
+    const initials = f.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const color = COLORS[i % COLORS.length];
+    const div = document.createElement('div');
+    div.className = 'face-item';
+    div.innerHTML = `
+      <div class="face-avatar" style="background:${color}18;border-color:${color}44;color:${color}">${initials}</div>
+      <div class="face-info">
+        <div class="face-name">${f.name}</div>
+        <div class="face-meta">ADDED ${new Date(f.addedAt||Date.now()).toLocaleDateString('en-IN')} · ${f.entries||1} ENTRIES</div>
+      </div>
+      <button class="face-remove" onclick="removeFace('${f.name}')" title="Remove">✕</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function removeFace(name) {
+  showConfirm('REMOVE FACE', 'Remove "' + name + '" from database?', () => {
+    const faces = getKnownFaces().filter(f => f.name !== name);
+    saveKnownFaces(faces);
+    renderFaceList();
+    db.collection('devices').doc(DEVICE_ID)
+      .collection('decisions').add({ decision: 'remove_face', name, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    addLog('Removed identity: ' + name, 'DB', 'warn');
+    showToast('Identity removed', 'warn');
+  });
+}
+
+function addFaceManually() {
+  const name = prompt('Enter full name for new face:');
+  if (!name || !name.trim()) return;
+  const n = name.trim();
+  const faces = getKnownFaces();
+  faces.push({ name: n, addedAt: new Date().toISOString(), entries: 0 });
+  saveKnownFaces(faces);
+  renderFaceList();
+  db.collection('devices').doc(DEVICE_ID)
+    .collection('decisions').add({ decision: 'add_face', name: n, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+  addLog('Manual entry: ' + n, 'DB', 'info');
+  showToast('Face added: ' + n, 'ok');
+}
+
+// ─── APPROVAL QUEUE ──────────────────────────────────────────────────────
+function renderQueue() {
+  const container = document.getElementById('queueContainer');
+  const empty = document.getElementById('queueEmpty');
+  const pending = pendingQueue.filter(r => r.status === 'pending');
+
+  document.getElementById('statPending').textContent = pending.length;
+  document.getElementById('pendLabel').textContent = 'PENDING: ' + pending.length;
+  document.getElementById('pendDot').className = 'pdot ' + (pending.length > 0 ? 'red' : 'amber');
+  document.getElementById('queueBadge').style.display = pending.length > 0 ? 'inline' : 'none';
+
+  container.querySelectorAll('.approval-card').forEach(el => el.remove());
+  if (empty) empty.style.display = pending.length === 0 ? 'block' : 'none';
+
+  pending.forEach(req => {
+    const card = document.createElement('div');
+    card.className = 'approval-card';
+    card.id = 'card_' + req.id;
+    const t = new Date(req.timestamp).toLocaleTimeString('en-IN', {hour12:false});
+    const imgHtml = req.image
+      ? `<img src="${req.image}" alt="face">`
+      : `<div class="ac-image-placeholder"><div style="font-size:36px;opacity:0.4">👤</div><div style="font-family:var(--mono);font-size:8px;color:var(--muted)">NO IMAGE</div></div>`;
+
+    card.innerHTML = `
+      <div class="ac-header">
+        <div class="ac-alert-label">
+          <div class="pdot red"></div>
+          ⚠ NEW FACE — APPROVAL REQUIRED
+        </div>
+        <div class="ac-time">${t}</div>
+      </div>
+      <div class="ac-body">
+        <div class="ac-image">${imgHtml}</div>
+        <div class="ac-details">
+          <div class="ac-name-label">SPOKEN NAME (BY VISITOR)</div>
+          <div class="ac-name-val">${req.name || '(no name)'}</div>
+          <div class="ac-meta-row">
+            <div class="ac-meta-line">ID: <span>${req.id}</span></div>
+            <div class="ac-meta-line">TIME: <span>${new Date(req.timestamp).toLocaleString('en-IN')}</span></div>
+            <div class="ac-meta-line">STATUS: <span style="color:var(--yellow)">AWAITING DECISION</span></div>
+          </div>
+          <div class="ac-edit-label" style="margin-bottom:4px">CONFIRM NAME:</div>
+          <div class="ac-edit-row">
+            <input class="ac-name-input" id="nameInput_${req.id}" value="${req.name || ''}" placeholder="Edit name if needed...">
+          </div>
+          <div class="ac-buttons">
+            <button class="btn-approve" onclick="approveRequest('${req.id}')">✓ APPROVE & OPEN DOOR</button>
+            <button class="btn-deny" onclick="denyRequest('${req.id}')">✗ DENY ACCESS</button>
+          </div>
+        </div>
+      </div>
+    `;
+    container.insertBefore(card, container.firstChild);
+  });
+  checkPendingAndRing();
+}
+
+function approveRequest(id) {
+  const req = pendingQueue.find(r => r.id === id);
+  if (!req || req.status !== 'pending') return;
+  const card = document.getElementById('card_' + id);
+  if (card) card.querySelectorAll('button').forEach(b => b.disabled = true);
+  const nameInput = document.getElementById('nameInput_' + id);
+  const name = (nameInput ? nameInput.value.trim() : req.name) || req.name || 'Unknown';
+  req.status = 'approved';
+  new Audio('/approve.mp3').play();
+
+  // Save to known faces
+  const faces = getKnownFaces();
+  const ex = faces.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
+  if (ex >= 0) { faces[ex].entries = (faces[ex].entries || 0) + 1; }
+  else { faces.push({ name, addedAt: new Date().toISOString(), entries: 1 }); }
+  saveKnownFaces(faces);
+
+    // Write decision to Firestore
+    db.collection('devices').doc(DEVICE_ID)
+      .collection('decisions').add({ decision: 'approve', id, name, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    // Also update approval doc status
+    db.collection('devices').doc(DEVICE_ID)
+      .collection('approvals').doc(id).update({ status: 'approved', reviewedAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+
+  stats.granted++;
+  document.getElementById('statGranted').textContent = stats.granted;
+
+  renderQueue();
+  checkPendingAndRing();
+  renderFaceList();
+  addLog('APPROVED: ' + name + ' — door signal sent', name, 'grant');
+  addRecentEvent('✓ Approved: ' + name, 'green');
+  showToast('Access granted: ' + name, 'ok');
+}
+
+function denyRequest(id) {
+  const req = pendingQueue.find(r => r.id === id);
+  if (!req || req.status !== 'pending') return;
+  const card = document.getElementById('card_' + id);
+  if (card) card.querySelectorAll('button').forEach(b => b.disabled = true);
+  req.status = 'denied';
+  new Audio('/deny.mp3').play();
+
+    db.collection('devices').doc(DEVICE_ID)
+      .collection('decisions').add({ decision: 'deny', id, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    db.collection('devices').doc(DEVICE_ID)
+      .collection('approvals').doc(id).update({ status: 'denied', reviewedAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+
+  stats.denied++;
+  document.getElementById('statDenied').textContent = stats.denied;
+
+  renderQueue();
+  checkPendingAndRing();
+  addLog('DENIED: ' + (req.name||'unknown') + ' — rejected', '?', 'deny');
+  addRecentEvent('✗ Denied: ' + (req.name||'unknown'), 'red');
+  showToast('Access denied', 'err');
+}
+
+// ─── NOBODY HOME ─────────────────────────────────────────────────────────
+function toggleNobody() {
+  nobodyActive = document.getElementById('nobodyToggle').checked;
+  localStorage.setItem('secura9_nobody', nobodyActive ? 'true' : 'false');
+  const label = document.getElementById('nobodyStateLabel');
+  label.textContent = nobodyActive ? 'ACTIVE' : 'INACTIVE';
+  label.className = 'toggle-state ' + (nobodyActive ? 'on' : 'off');
+  db.collection('devices').doc(DEVICE_ID)
+    .collection('status').doc('live').update({ nobodyHome: nobodyActive }).catch(() => {});
+  db.collection('devices').doc(DEVICE_ID)
+    .collection('decisions').add({ decision: 'nobody_home', active: nobodyActive, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+  addLog(nobodyActive ? 'Nobody home mode ON' : 'Nobody home mode OFF', 'SYS', nobodyActive ? 'warn' : 'info');
+  showToast(nobodyActive ? 'Nobody home broadcast ON' : 'Nobody home broadcast OFF', nobodyActive ? 'warn' : 'ok');
+  addRecentEvent(nobodyActive ? '🏠 Nobody home: ON' : '🏠 Nobody home: OFF', nobodyActive ? 'red' : 'cyan');
+}
+
+// ─── ACCESS LOG ──────────────────────────────────────────────────────────
+function addLog(msg, name, type) {
+  const log = document.getElementById('accessLog');
+  const t = new Date().toLocaleTimeString('en-IN', {hour12:false});
+  const initials = name ? name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) : 'S9';
+  const colorMap = { grant: '#00ff88', deny: '#ff003c', info: '#00ffe5', warn: '#ffe600' };
+  const c = colorMap[type] || '#00ffe5';
+
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `
+    <div class="log-avatar" style="background:${c}18;border:1px solid ${c}44;color:${c}">${initials}</div>
+    <div class="log-info">
+      <div class="log-name">${msg}</div>
+      <div class="log-detail">${t}</div>
+    </div>
+    <div class="log-badge ${type}">${type.toUpperCase()}</div>
+  `;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+
+// ─── RECENT EVENTS ───────────────────────────────────────────────────────
+function addRecentEvent(msg, color) {
+  const panel = document.getElementById('recentEvents');
+  panel.querySelectorAll('.recent-empty').forEach(el => el.remove());
+  const t = new Date().toLocaleTimeString('en-IN', {hour12:false});
+  const colors = { green: '#00ff88', red: '#ff003c', cyan: '#00ffe5', amber: '#ffe600' };
+  const c = colors[color] || '#00ffe5';
+  const div = document.createElement('div');
+  div.style.cssText = 'padding:8px 14px;border-bottom:1px solid rgba(0,255,229,0.06);font-family:var(--mono);font-size:9px;';
+  div.innerHTML = `<span style="color:${c}">${msg}</span><br><span style="color:var(--muted)">${t}</span>`;
+  panel.insertBefore(div, panel.firstChild);
+  while (panel.children.length > 20) panel.removeChild(panel.lastChild);
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.4s'; setTimeout(() => t.remove(), 400); }, 3000);
+}
+
+// ─── CONFIRM DIALOG ──────────────────────────────────────────────────────
+let confirmCallback = null;
+function showConfirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  confirmCallback = cb;
+  document.getElementById('confirmOkBtn').onclick = () => { hideConfirm(); if(confirmCallback) confirmCallback(); };
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function hideConfirm() { document.getElementById('confirmOverlay').classList.remove('show'); }
+
+// ─── SIMULATION TOOLS ────────────────────────────────────────────────────
+function simKnownFace() {
+  const faces = getKnownFaces();
+  const name = faces.length > 0 ? faces[Math.floor(Math.random()*faces.length)].name : 'Test User';
+  stats.granted++;
+  document.getElementById('statGranted').textContent = stats.granted;
+  addLog('Known face detected: ' + name, name, 'grant');
+  addRecentEvent('✓ Access granted: ' + name, 'green');
+  showToast('Simulated: ' + name + ' entered', 'ok');
+}
+
+function simNewFace() {
+  const names = ['Rahul Das', 'Priya Sen', 'Amit Roy', 'Sneha Bose', 'Vikram Pal'];
+  const n = names[Math.floor(Math.random()*names.length)];
+  const req = {
+    id: 'req_' + Date.now(),
+    name: n,
+    image: null,
+    timestamp: new Date().toISOString(),
+    status: 'pending',
+  };
+  pendingQueue.unshift(req);
+  renderQueue();
+  checkPendingAndRing();
+  addLog('Simulated new face: ' + n, '?', 'warn');
+  addRecentEvent('⚠ New face: ' + n, 'amber');
+  showToast('Simulated request: ' + n, 'warn');
+}
+
+function simDenied() {
+  stats.denied++;
+  document.getElementById('statDenied').textContent = stats.denied;
+  addLog('Unauthorized attempt — blocked', '!', 'deny');
+  addRecentEvent('✗ Unauthorized attempt', 'red');
+  showToast('Unauthorized attempt logged', 'err');
+}
+
+// ─── UI STATE ────────────────────────────────────────────────────────────
+function setPiUI(online) {
+  piOnline = online;
+  document.getElementById('piDot').className = 'pdot ' + (online ? 'green' : 'gray');
+  document.getElementById('piLabel').textContent = online ? 'PI ONLINE' : 'PI OFFLINE';
+  if (!online) {
+    ['dsConn','dsCam','dsEngine','dsDoor'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = '--'; el.className = 'ds-val off'; }
+    });
+  }
+}
+
+// ─── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.ctrlKey) {
+    const pending = pendingQueue.filter(r => r.status === 'pending');
+    if (pending.length) approveRequest(pending[pending.length - 1].id);
+  }
+  if (e.key === 'Delete' && e.ctrlKey) {
+    const pending = pendingQueue.filter(r => r.status === 'pending');
+    if (pending.length) denyRequest(pending[pending.length - 1].id);
+  }
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setFbUI(false);
+  setPiUI(false);
+  try {
+    const saved = JSON.parse(localStorage.getItem('secura9_pending') || '[]');
+    pendingQueue = saved;
+  } catch(e) {}
+  renderFaceList();
+  renderQueue();
+
+  const nh = localStorage.getItem('secura9_nobody');
+  if (nh === 'true') {
+    document.getElementById('nobodyToggle').checked = true;
+    nobodyActive = true;
+    document.getElementById('nobodyStateLabel').textContent = 'ACTIVE';
+    document.getElementById('nobodyStateLabel').className = 'toggle-state on';
+  }
+});
+</script>
+</body>
+</html>
