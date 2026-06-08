@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "secura9-pi-security-system"
+  },
+  "targets": {
+    "secura9-pi-security-system": {
+      "hosting": {
+        "webdeck": [
+          "secura9-pi-security-system"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

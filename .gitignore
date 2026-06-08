@@ -1,14 +1,16 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*.so
 *.egg-info/
 dist/
 build/
+*.egg
 
 # Virtual environments
 venv/
 env/
+.venv/
 facelock/
 
 # Data directories
@@ -16,6 +18,41 @@ faces/
 clips/
 logs/
 snapshots/
+
+# Secrets (provisioned at runtime)
+/etc/secura9/
+**/serviceAccountKey.json
+*.local
+firebase_adapter/serviceAccountKey.json
+
+# Core dumps
+core.*
+
+# Voice/generated data
+secura9_voices_*.json
+sounds/_tts_cache/
+sounds/*.wav
+sounds/*.mp3
+!sounds/approve.mp3
+!sounds/deny.mp3
+!sounds/welcome.wav
+
+# Android
+android-dashboard/.gradle/
+android-dashboard/build/
+android-dashboard/app/build/
+android-dashboard/local.properties
+android-dashboard/.idea/
+android-dashboard/app/google-services.json
+*.iml
+.gradle/
+build/
+local.properties
+
+# Generated images
+deploy/image-builder/build/
+*.img
+*.img.gz
 
 # OS/tools
 .DS_Store
@@ -28,19 +65,5 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Secrets (provisioned at runtime)
-/etc/secura9/
-
-# Firebase credentials
-firebase_adapter/serviceAccountKey.json
-
-# Core dumps
-core.*
-
-# Voice/generated data
-secura9_voices_*.json
-
-# Generated images
-deploy/image-builder/build/
-*.img
-*.img.gz
+# Logs
+*.log
