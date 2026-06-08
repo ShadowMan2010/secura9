@@ -1,0 +1,18 @@
+[Unit]
+Description=SECURA-9 First-Boot Provisioning
+ConditionPathExists=!/etc/secura9/config.json
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/secura9
+ExecStart=/opt/secura9/venv/bin/python /opt/secura9/deploy/provisioning/provisioner.py
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

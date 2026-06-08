@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+facelock/
+
+# Data directories
+faces/
+clips/
+logs/
+snapshots/
+
+# OS/tools
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets (provisioned at runtime)
+/etc/secura9/
+
+# Firebase credentials
+firebase_adapter/serviceAccountKey.json
+
+# Core dumps
+core.*
+
+# Voice/generated data
+secura9_voices_*.json
+
+# Generated images
+deploy/image-builder/build/
+*.img
+*.img.gz

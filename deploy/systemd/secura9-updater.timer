@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for SECURA-9 updates daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=3600
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,21 @@
+[Unit]
+Description=SECURA-9 Biometric Access Control
+After=network.target firebase.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=secura9
+Group=secura9
+WorkingDirectory=/opt/secura9
+ExecStart=/opt/secura9/venv/bin/python /opt/secura9/main.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+[Install]
+WantedBy=multi-user.target
