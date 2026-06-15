@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0A0210</color>
+    <color name="cyan">#00FFFF</color>
+    <color name="green">#39FF14</color>
+    <color name="pink">#FF007F</color>
+    <color name="purple">#BC13FE</color>
+    <color name="yellow">#FFFF00</color>
+    <color name="text">#C8E6FF</color>
+    <color name="muted">#5A5078</color>
+    <color name="panel">#140523</color>
+    <color name="panel2">#1E0A32</color>
+</resources>

@@ -14,7 +14,11 @@ import cv2
 import numpy as np
 from aiortc import RTCPeerConnection, RTCConfiguration, RTCIceServer, RTCSessionDescription, VideoStreamTrack, AudioStreamTrack
 from av import VideoFrame, AudioFrame
-import pyaudio
+try:
+    import pyaudio
+    PYAUDIO_OK = True
+except ImportError:
+    PYAUDIO_OK = False
 import numpy as np
 from firebase_admin import firestore
 
@@ -58,11 +62,17 @@ class CameraVideoTrack(VideoStreamTrack):
 class AudioPlayer:
     """Plays incoming WebRTC audio from Android through the speaker."""
     def __init__(self):
-        self._pa = pyaudio.PyAudio()
+        self._pa = None
         self._stream = None
         self._running = False
+        if not PYAUDIO_OK:
+            log.warning('pyaudio not installed — AudioPlayer disabled')
+            return
+        self._pa = pyaudio.PyAudio()
 
     def start(self):
+        if not PYAUDIO_OK or not self._pa:
+            return
         self._running = True
         try:
             self._stream = self._pa.open(
@@ -101,8 +111,12 @@ class MicrophoneAudioTrack(AudioStreamTrack):
     def __init__(self):
         super().__init__()
         self._running = True
-        self._pa = pyaudio.PyAudio()
+        self._pa = None
         self._stream = None
+        if not PYAUDIO_OK:
+            log.warning('pyaudio not installed — microphone disabled')
+            return
+        self._pa = pyaudio.PyAudio()
         self._init_stream()
 
     def _init_stream(self):
@@ -150,10 +164,11 @@ class MicrophoneAudioTrack(AudioStreamTrack):
 
 
 class WebRTCBroadcaster:
-    def __init__(self, db, get_frame_fn, device_id='secura9_pi_01'):
+    def __init__(self, db, get_frame_fn, device_id='secura9_pi_01', on_unlock_request=None):
         self._db = db
         self._get_frame = get_frame_fn
         self._device_id = device_id
+        self._on_unlock_request = on_unlock_request
         self._pc: Optional[RTCPeerConnection] = None
         self._track: Optional[CameraVideoTrack] = None
         self._audio_track: Optional[MicrophoneAudioTrack] = None
@@ -164,6 +179,7 @@ class WebRTCBroadcaster:
         self._viewer_ice_listener = None
         self._viewer_ice_unsub = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._busy = asyncio.Lock()
 
     def _get_signaling_ref(self, session_id=None):
         sid = session_id or self._session_id
@@ -197,37 +213,44 @@ class WebRTCBroadcaster:
             pass
 
     async def _handle_session(self, doc_id, data):
+        async with self._busy:
+            return await self._handle_session_locked(doc_id, data)
+
+    async def _handle_session_locked(self, doc_id, data):
         if self._pc:
             await self._cleanup()
 
         self._session_id = doc_id
         offer = data.get('offer')
         if not offer:
-            return
+            return False
 
         log.info(f'Handling new WebRTC session: {doc_id}')
 
-        self._pc = RTCPeerConnection(configuration=_make_config())
+        pc = RTCPeerConnection(configuration=_make_config())
+        self._pc = pc
 
-        @self._pc.on('iceconnectionstatechange')
+        @pc.on('iceconnectionstatechange')
         async def on_ice():
-            if not self._pc:
+            if self._pc is not pc:
                 return
-            s = self._pc.iceConnectionState
+            s = pc.iceConnectionState
             log.info(f'ICE: {s}')
             if s in ('failed', 'disconnected', 'closed'):
                 await self._cleanup()
 
-        @self._pc.on('connectionstatechange')
+        @pc.on('connectionstatechange')
         async def on_conn():
-            if not self._pc:
+            if self._pc is not pc:
                 return
-            s = self._pc.connectionState
+            s = pc.connectionState
             log.info(f'Connection: {s}')
             self._update_webrtc_status(s)
 
-        @self._pc.on('icecandidate')
+        @pc.on('icecandidate')
         async def on_candidate(candidate):
+            if self._pc is not pc:
+                return
             if candidate:
                 self._push_ice_candidate({
                     'candidate': candidate.candidate,
@@ -238,29 +261,35 @@ class WebRTCBroadcaster:
         # Incoming audio from Android (two-way talk)
         self._audio_player = AudioPlayer()
 
-        @self._pc.on('track')
+        @pc.on('track')
         async def on_track(track):
+            if self._pc is not pc:
+                return
             if track.kind == 'audio':
                 log.info('Incoming audio track from viewer')
+                if not self._audio_player:
+                    return
                 self._audio_player.start()
                 try:
                     while True:
                         frame = await track.recv()
-                        self._audio_player.feed(frame)
+                        if self._audio_player:
+                            self._audio_player.feed(frame)
                 except Exception:
                     pass
-                self._audio_player.stop()
+                if self._audio_player:
+                    self._audio_player.stop()
 
         # Add camera track
         self._track = CameraVideoTrack(self._get_frame)
-        self._pc.addTrack(self._track)
+        pc.addTrack(self._track)
 
         # Add mic audio track only if the offer includes audio
         offer_sdp = offer.get('sdp', '')
         has_audio = 'm=audio' in offer_sdp
         if has_audio:
             self._audio_track = MicrophoneAudioTrack()
-            self._pc.addTrack(self._audio_track)
+            pc.addTrack(self._audio_track)
             log.info('Audio track added (offer includes audio)')
         else:
             log.info('Offer has no audio — mic track skipped')
@@ -269,19 +298,19 @@ class WebRTCBroadcaster:
             log.info(f'WebRTC step: setRemoteDescription for {doc_id}')
             try:
                 await asyncio.wait_for(
-                    self._pc.setRemoteDescription(RTCSessionDescription(
+                    pc.setRemoteDescription(RTCSessionDescription(
                         type=offer['type'], sdp=offer['sdp'])),
                     timeout=10)
             except asyncio.TimeoutError:
                 log.error(f'WebRTC: setRemoteDescription timed out for {doc_id}')
                 await self._cleanup()
-                return
+                return False
             log.info(f'WebRTC step: remoteDescription set for {doc_id}')
 
-            answer = await self._pc.createAnswer()
+            answer = await pc.createAnswer()
             log.info(f'WebRTC step: answer created for {doc_id}')
 
-            await self._pc.setLocalDescription(answer)
+            await pc.setLocalDescription(answer)
             log.info(f'WebRTC step: localDescription set for {doc_id}')
 
             ref = self._get_signaling_ref()
@@ -289,41 +318,70 @@ class WebRTCBroadcaster:
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(
                     None, lambda: ref.set({'answer': {
-                        'type': self._pc.localDescription.type,
-                        'sdp': self._pc.localDescription.sdp,
+                        'type': pc.localDescription.type,
+                        'sdp': pc.localDescription.sdp,
                     }}, merge=True))
                 log.info(f'WebRTC step: answer written to Firestore for {doc_id}')
 
+                self._viewer_ice_pc = pc
                 self._viewer_ice_unsub = ref.collection('viewerIce').on_snapshot(
                     self._on_viewer_ice_snapshot)
                 log.info(f'WebRTC step: viewerIce listener set for {doc_id}')
 
+                # Listen for unlock requests during the call
+                self._session_id = doc_id
+                self._start_unlock_listener(ref)
+
             self._update_webrtc_status('answering')
             log.info(f'WebRTC answer sent for {doc_id}')
+            return True
         except Exception as e:
             log.error(f'WebRTC session {doc_id} failed: {e}', exc_info=True)
             await self._cleanup()
+            return False
+
+    def _start_unlock_listener(self, session_ref):
+        def on_session_change(docs, changes, _):
+            for change in changes:
+                if change.type.name == 'MODIFIED':
+                    data = change.document.to_dict()
+                    if data.get('unlockRequest') and not data.get('unlockGranted'):
+                        log.info('Unlock requested during call')
+                        if self._on_unlock_request:
+                            self._on_unlock_request()
+                        try:
+                            session_ref.set({'unlockGranted': True, 'unlockRequest': False},
+                                            merge=True)
+                        except Exception as e:
+                            log.warning(f'Failed to write unlockGranted: {e}')
+
+        self._session_unsub = session_ref.on_snapshot(on_session_change)
+        log.info('Unlock-on-demand listener active')
 
     def _on_viewer_ice_snapshot(self, docs, changes, read_time):
         """Add viewer ICE candidates as they arrive."""
+        pc = self._viewer_ice_pc
+        if not pc or self._pc is not pc:
+            return
         for change in changes:
             if change.type.name != 'ADDED':
                 continue
             data = change.document.to_dict()
             c = data.get('candidate')
-            if not c or not self._pc:
+            if not c:
                 continue
             try:
                 if self._loop and self._loop.is_running():
                     asyncio.run_coroutine_threadsafe(
-                        self._pc.addIceCandidate(c), self._loop)
+                        pc.addIceCandidate(c), self._loop)
             except Exception as e:
                 log.warning(f'Viewer ICE add error: {e}')
 
     async def _cleanup(self):
         if self._viewer_ice_unsub:
             self._viewer_ice_unsub.unsubscribe()
-            self._viewer_ice_unsub = None
+        self._viewer_ice_unsub = None
+        self._viewer_ice_pc = None
         if self._track:
             self._track.stop()
             self._track = None
@@ -363,19 +421,31 @@ class WebRTCBroadcaster:
     async def _poll_sessions(self):
         """Poll for new WebRTC sessions every 2 seconds (Firestore on_snapshot unreliable)."""
         seen = set()
+        cleaned = False
         while True:
             try:
                 docs = self._sessions_ref.limit(10).get()
                 for doc in docs:
                     doc_id = doc.id
+                    data = doc.to_dict()
+                    # On first poll, delete stale un-answered offers from prior runs
+                    if not cleaned and data.get('offer') and not data.get('answer'):
+                        log.info(f'Cleaning stale session: {doc_id}')
+                        try:
+                            doc.reference.delete()
+                        except Exception:
+                            pass
+                        continue
                     if doc_id in seen:
                         continue
-                    data = doc.to_dict()
                     if data.get('offer') and not data.get('answer'):
-                        seen.add(doc_id)
                         log.info(f'Poll found session: {doc_id}')
-                        asyncio.create_task(
-                            self._handle_session(doc_id, data))
+                        ok = await self._handle_session(doc_id, data)
+                        if ok:
+                            seen.add(doc_id)
+                        else:
+                            log.info(f'Session {doc_id} failed — will retry next poll')
+                cleaned = True
                 await asyncio.sleep(2)
             except Exception as e:
                 log.warning(f'Poll error: {e}')
@@ -396,8 +466,8 @@ class WebRTCBroadcaster:
 
 
 class WebRTCThread:
-    def __init__(self, db, get_frame_fn):
-        self._broadcaster = WebRTCBroadcaster(db, get_frame_fn)
+    def __init__(self, db, get_frame_fn, on_unlock_request=None):
+        self._broadcaster = WebRTCBroadcaster(db, get_frame_fn, on_unlock_request=on_unlock_request)
         self._thread = None
         self._loop = None
 

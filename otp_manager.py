@@ -17,13 +17,16 @@ class OTPManager:
         self._otp: str = ''
         self._generated_at: float = 0.0
         self._valid = False
+        self._custom_expiry: int = None
 
-    def generate(self) -> str:
-        """Generate a new 6-digit OTP."""
+    def generate(self, expiry_seconds: int = None) -> str:
+        """Generate a new 6-digit OTP with optional custom expiry."""
         self._otp = f'{random.randint(0, 999999):06d}'
         self._generated_at = time.time()
         self._valid = True
-        log.info(f'OTP generated: {self._otp}')
+        self._custom_expiry = expiry_seconds
+        log.info(f'OTP generated: {self._otp}'
+                 f'{" (" + str(expiry_seconds) + "s)" if expiry_seconds else ""}')
         return self._otp
 
     def validate(self, spoken: str) -> tuple[bool, str]:
@@ -59,5 +62,6 @@ class OTPManager:
         if not self._valid or not self._generated_at:
             return 0
         elapsed = time.time() - self._generated_at
-        remaining = config.OTP_EXPIRY_SECONDS - elapsed
+        expiry = self._custom_expiry if self._custom_expiry else config.OTP_EXPIRY_SECONDS
+        remaining = expiry - elapsed
         return max(0, int(remaining))

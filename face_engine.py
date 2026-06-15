@@ -23,6 +23,14 @@ except ImportError:
     FR = False
     log.warning('face_recognition not installed -> motion fallback active')
 
+try:
+    from picamera2 import Picamera2
+    PICAM2 = True
+    log.info('picamera2 available (Pi Camera CSI)')
+except ImportError:
+    PICAM2 = False
+    log.warning('picamera2 not available -> OpenCV only')
+
 class FaceEngine:
 
     def __init__(
@@ -33,6 +41,7 @@ class FaceEngine:
         on_lookaside: Callable,
         on_motion: Optional[Callable] = None,
         display=None,
+        gpio=None,
     ) -> None:
         self.on_known     = on_known
         self.on_unknown   = on_unknown
@@ -40,9 +49,11 @@ class FaceEngine:
         self.on_lookaside = on_lookaside
         self.on_motion    = on_motion
         self._display     = display
+        self._gpio        = gpio
 
         self._running     = False
         self._cap: Optional[cv2.VideoCapture] = None
+        self._picam2: Optional['Picamera2'] = None
 
         self._frame_lock    = threading.Lock()
         self._current_frame: Optional[np.ndarray] = None
@@ -158,38 +169,76 @@ class FaceEngine:
     def run(self) -> None:
         self._running = True
 
+        # ── Open camera ───────────────────────────────────────────────────
+        if config.PI_CAMERA_ENABLED and PICAM2:
+            log.info('Using Pi Camera CSI (picamera2)')
+            try:
+                self._picam2 = Picamera2()
+                cfg = self._picam2.create_preview_configuration(
+                    main={'size': (config.CAMERA_WIDTH, config.CAMERA_HEIGHT)},
+                    lores={'size': (320, 240)},
+                    encode='main',
+                )
+                self._picam2.configure(cfg)
+
+                if config.PI_CAMERA_AF_MODE == 'continuous':
+                    self._picam2.set_controls({'AfMode': 2})  # CAF
+                elif config.PI_CAMERA_AF_MODE == 'auto':
+                    self._picam2.set_controls({'AfMode': 1, 'AfTrigger': 0})
+
+                self._picam2.start()
+                log.info('Picamera2 started')
+            except Exception as e:
+                log.error(f'Picamera2 failed: {e}')
+                log.warning('Falling back to OpenCV')
+                self._picam2 = None
+
         source = config.CAMERA_SOURCE
-        if isinstance(source, str):
-            cap = cv2.VideoCapture(source)
-            log.info(f'Opening IP camera: {source}')
-        else:
-            cap = cv2.VideoCapture(source)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
-            cap.set(cv2.CAP_PROP_FPS,          config.CAMERA_FPS)
-            cap.set(cv2.CAP_PROP_BUFFERSIZE,   1)
-            log.info(f'Opening camera index: {source}')
-        self._cap = cap
+        if self._picam2 is None:
+            if isinstance(source, str):
+                cap = cv2.VideoCapture(source)
+                log.info(f'Opening IP camera: {source}')
+            else:
+                cap = cv2.VideoCapture(source)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+                cap.set(cv2.CAP_PROP_FPS,          config.CAMERA_FPS)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE,   1)
+                log.info(f'Opening camera index: {source}')
+            self._cap = cap
+            if not cap.isOpened():
+                log.error(f'Cannot open camera source: {config.CAMERA_SOURCE}')
+                log.error('  - For USB camera: set CAMERA_SOURCE = 0 in config.py')
+                log.error('  - For Pi Camera:  set PI_CAMERA_ENABLED = True')
+                log.error('  - For DroidCam:   set CAMERA_SOURCE = "http://phone-ip:4747/video"')
+                log.error('  - List devices:   ls /dev/video*')
+                while self._running:
+                    time.sleep(1)
+                return
 
-        if not cap.isOpened():
-            log.error(f'Cannot open camera source: {config.CAMERA_SOURCE}')
-            log.error('  - For USB camera: set CAMERA_SOURCE = 0 in config.py')
-            log.error('  - For DroidCam:   set CAMERA_SOURCE = "http://phone-ip:4747/video"')
-            log.error('  - List devices:   ls /dev/video*')
-            log.error('  - Test camera:    python3 -c "import cv2; cap=cv2.VideoCapture(0); print(cap.isOpened())"')
-            while self._running:
-                time.sleep(1)
-            return
+            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            log.info(f'Camera {w}x{h} opened')
 
-        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        log.info(f'Camera {w}x{h} opened')
+        # ── IR illuminator auto-control ───────────────────────────────────
+        if self._gpio and config.IR_ILLUMINATOR_ENABLED:
+            dark = self._gpio.is_dark()
+            self._gpio.set_ir(dark)
+            log.info(f'IR illuminator: {"ON (dark)" if dark else "OFF (bright)"}')
 
         camera_failures = 0
 
         while self._running:
-            ret, frame = cap.read()
-            if not ret:
+            # ── Read frame ────────────────────────────────────────────────
+            if self._picam2 is not None:
+                frame = self._picam2.capture_array()
+                ret = frame is not None
+                if ret and frame.shape[0] != config.CAMERA_HEIGHT:
+                    frame = cv2.resize(frame, (config.CAMERA_WIDTH, config.CAMERA_HEIGHT))
+            else:
+                ret, frame = cap.read()
+
+            if self._picam2 is None and not ret:
                 camera_failures += 1
                 log.warning(f'Camera read error ({camera_failures})')
                 if camera_failures > 50:
@@ -244,7 +293,18 @@ class FaceEngine:
             else:
                 self._process_motion(frame)
 
-        cap.release()
+        if self._picam2 is not None:
+            self._picam2.stop()
+            self._picam2 = None
+            log.info('Picamera2 stopped')
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
+
+        if self._gpio and config.IR_ILLUMINATOR_ENABLED:
+            self._gpio.set_ir(False)
+            log.info('IR illuminator off (camera stopped)')
+
         log.info('Camera stopped')
 
     # ── FACE RECOGNITION ──────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import android.util.Base64
 import android.util.Log
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
 import com.google.firebase.messaging.FirebaseMessaging
@@ -39,10 +40,10 @@ class FirebaseRepository {
     private val _clips = MutableStateFlow<List<ClipInfo>>(emptyList())
     val clips: StateFlow<List<ClipInfo>> = _clips
 
-    private var statusListener: () -> Unit = {}
-    private var notificationListener: () -> Unit = {}
-    private var approvalListener: () -> Unit = {}
-    private var otpListener: () -> Unit = {}
+    private var statusListener: ListenerRegistration? = null
+    private var notificationListener: ListenerRegistration? = null
+    private var approvalListener: ListenerRegistration? = null
+    private var otpListener: ListenerRegistration? = null
 
     fun startListening() {
         listenDeviceStatus()
@@ -53,10 +54,10 @@ class FirebaseRepository {
     }
 
     fun stopListening() {
-        statusListener()
-        notificationListener()
-        approvalListener()
-        otpListener()
+        statusListener?.remove()
+        notificationListener?.remove()
+        approvalListener?.remove()
+        otpListener?.remove()
     }
 
     private fun listenDeviceStatus() {
@@ -80,6 +81,8 @@ class FirebaseRepository {
                             camera = data["camera"] as? Boolean ?: false,
                             engine = data["engine"] as? Boolean ?: false,
                             webrtc = data["webrtc"] as? String ?: "idle",
+                            passageMode = data["passageMode"] as? Boolean ?: false,
+                            otaAvailable = data["otaAvailable"] as? Boolean ?: false,
                             timestamp = (data["lastUpdated"] as? com.google.firebase.Timestamp)
                                 ?.toDate()?.time ?: System.currentTimeMillis(),
                         )
@@ -275,5 +278,48 @@ class FirebaseRepository {
             Log.e(TAG, "getWebRTCSession failed", e)
             null
         }
+    }
+
+    // ── New Actions ───────────────────────────────────────────────────────
+
+    suspend fun unlockDuringCall(sessionId: String) {
+        try {
+            db.collection(DEVICES_COLLECTION)
+                .document(DEVICE_ID)
+                .collection("webrtc")
+                .document(sessionId)
+                .update("unlockRequest", true)
+                .await()
+            Log.i(TAG, "Unlock request sent during call")
+        } catch (e: Exception) {
+            Log.e(TAG, "Unlock during call failed", e)
+        }
+    }
+
+    suspend fun passageOn() {
+        sendCommand("passage_on")
+    }
+
+    suspend fun passageOff() {
+        sendCommand("passage_off")
+    }
+
+    suspend fun generateTimedCode(durationSeconds: Int = 300, label: String = "App") {
+        sendCommand("generate_timed_code", mapOf(
+            "duration" to durationSeconds,
+            "label" to label,
+        ))
+    }
+
+    suspend fun checkOTA() {
+        sendCommand("ota_check")
+    }
+
+    suspend fun applyOTA() {
+        sendCommand("ota_apply")
+    }
+
+    suspend fun updateSchedule(rules: List<Map<String, Any>>) {
+        sendCommand("update_schedule", mapOf("rules" to rules))
     }
 }

@@ -237,6 +237,9 @@ class Display:
     OTP_ENTER   = 'otp_enter'
     OTP_WRONG   = 'otp_wrong'
     OTP_EXPIRED = 'otp_expired'
+    PASSAGE     = 'passage'
+    DUAL_AUTH   = 'dual_auth'
+    ALARM       = 'alarm'
     def __init__(self):
         self._state    = self.BOOT
         self._lock     = threading.Lock()
@@ -292,6 +295,11 @@ class Display:
         self._cam_ok        = True
         self._webrtc_ok     = False
         self._door_locked   = True
+        self._passage_active = False
+
+        # Dual auth
+        self._dual_auth_name = ''
+        self._dual_auth_conf = 0.0
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -355,11 +363,24 @@ class Display:
         self._otp_digits = ''
         self._otp_submitted = False
 
-    def set_status(self, fb=None, cam=None, webrtc=None, door_locked=None):
+    def show_passage(self, active=True):
+        self._passage_active = active
+        self._set(self.PASSAGE)
+
+    def show_dual_auth(self, name='', confidence=0.0):
+        self._dual_auth_name = name
+        self._dual_auth_conf = confidence
+        self._set(self.DUAL_AUTH)
+
+    def show_alarm(self):
+        self._set(self.ALARM)
+
+    def set_status(self, fb=None, cam=None, webrtc=None, door_locked=None, passage=None):
         if fb is not None:      self._fb_ok = fb
         if cam is not None:     self._cam_ok = cam
         if webrtc is not None:  self._webrtc_ok = webrtc
         if door_locked is not None: self._door_locked = door_locked
+        if passage is not None: self._passage_active = passage
 
     def update_camera(self, frame_bgr, face_boxes=None):
         if frame_bgr is None:
@@ -549,6 +570,9 @@ class Display:
                 elif s == self.OTP_ENTER:   self._panel_otp_enter()
                 elif s == self.OTP_WRONG:   self._panel_otp_wrong()
                 elif s == self.OTP_EXPIRED: self._panel_otp_expired()
+                elif s == self.PASSAGE:     self._panel_passage()
+                elif s == self.DUAL_AUTH:   self._panel_dual_auth()
+                elif s == self.ALARM:       self._panel_alarm()
 
             # CRT scanline overlay (subtle)
             if self._crt_surf:
@@ -1447,8 +1471,8 @@ class Display:
         self._tc('🔐  OTP GENERATED', 18, config.COL_CYAN, cx, py+18, bold=True)
         self._tc('CHECK YOUR PHONE',  11, config.COL_MUTED, cx, py+42)
 
-        # Show OTP big
-        self._tc(self._otp_display, 42, config.COL_GREEN, cx, mid_y-18, bold=True)
+        # OTP is NOT shown on screen — sent via notification only
+        self._tc('••••••', 42, config.COL_GREEN, cx, mid_y - 18, bold=True)
 
         remaining = max(0, int(self._otp_expiry - self._elapsed()))
         self._tc(f'Expires in {remaining}s', 13, config.COL_YELLOW, cx, mid_y+18)
@@ -1535,6 +1559,56 @@ class Display:
 
         draw_waveform(self._scr, px+8, py+ph-28, pw-16, 22,
                       config.COL_RED, self._t, bars=36, active=True)
+
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _panel_passage(self):
+        px, py, pw, ph = self._panel_base(config.COL_GREEN, 10)
+        cx = self._panel_cx()
+        mid_y = py + ph // 2
+        self._tc('🚪 PASSAGE MODE', 22, config.COL_GREEN, cx, mid_y - 20, bold=True)
+        self._tc('Door stays unlocked', 14, config.COL_WHITE, cx, mid_y + 14)
+        self._tc('Disable from app or hold button', 11, config.COL_MUTED, cx, mid_y + 38)
+
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _panel_dual_auth(self):
+        px, py, pw, ph = self._panel_base(config.COL_CYAN, 10)
+        cx = self._panel_cx()
+        mid_y = py + ph // 2
+        self._tc('🔐 DUAL AUTH', 18, config.COL_CYAN, cx, py+16, bold=True)
+        self._tc(f'Face matched: {self._dual_auth_name}', 12, config.COL_GREEN, cx, py+44)
+        self._tc('Now enter OTP to unlock', 13, config.COL_TEXT, cx, mid_y-10)
+        self._tc('Enter 6-digit code below', 12, config.COL_MUTED, cx, mid_y+18)
+
+        boxes_y = mid_y + 50
+        box_w, box_h, gap = 36, 44, 6
+        total = 6 * box_w + 5 * gap
+        x0 = cx - total // 2
+        for i in range(6):
+            bx = x0 + i * (box_w + gap)
+            filled = i < len(self._otp_digits)
+            col = config.COL_GREEN if filled else config.COL_MUTED
+            pygame.draw.rect(self._scr, config.COL_PANEL2, (bx, boxes_y, box_w, box_h), 0, 4)
+            pygame.draw.rect(self._scr, col, (bx, boxes_y, box_w, box_h), 1, 4)
+            if i < len(self._otp_digits):
+                self._tc(self._otp_digits[i], 24, config.COL_GREEN, bx + box_w // 2, boxes_y + box_h // 2 - 4, bold=True)
+
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _panel_alarm(self):
+        px, py, pw, ph = self._panel_base(config.COL_RED, 14)
+        cx = self._panel_cx()
+        mid_y = py + ph // 2
+
+        pulsing = config.COL_RED if int(self._t * 3) % 2 == 0 else (180, 0, 60)
+        self._tc('🚨  TAMPER ALARM', 24, pulsing, cx, mid_y - 30, bold=True)
+        self._tc('INTRUSION DETECTED', 16, config.COL_RED, cx, mid_y + 6, bold=True)
+        self._tc('Authorities notified', 12, config.COL_MUTED, cx, mid_y + 36)
+
+        poly = [(cx - 40, mid_y - 80), (cx, mid_y - 120), (cx + 40, mid_y - 80)]
+        pygame.draw.polygon(self._scr, pulsing, poly)
+        pygame.draw.circle(self._scr, pulsing, (cx, mid_y - 68), 6)
 
     # ──────────────────────────────────────────────────────────────────────
 

@@ -1,53 +1,73 @@
 """
 SECURA-9 Configuration — all settings in one place.
+Override priority: /etc/secura9/config.json > env var SECURA9_* > defaults below
 """
+from __future__ import annotations
+import json
 import os
 
+# ── Config file paths (checked at import time) ──────────────────────────
+CONFIG_DIR      = '/etc/secura9'
+CONFIG_PATH     = os.path.join(CONFIG_DIR, 'config.json')
+FIREBASE_PATH   = os.path.join(CONFIG_DIR, 'firebase.json')
+DEVICE_ID_PATH  = os.path.join(CONFIG_DIR, 'device_id')
+
+# PROVISIONED = both config.json and firebase.json exist
+PROVISIONED = os.path.exists(CONFIG_PATH) and os.path.exists(FIREBASE_PATH)
+
 # ── SERVER ────────────────────────────────────────────────────────────────
-SERVER_IP       = '127.0.0.1'   # localhost for testing
+SERVER_IP       = '127.0.0.1'
 SERVER_PORT     = 3000
 SERVER_WS_URL   = f'ws://{SERVER_IP}:{SERVER_PORT}/ws?type=device'
 SERVER_HTTP_URL = f'http://{SERVER_IP}:{SERVER_PORT}'
 
+DEVICE_ID       = 'secura9_pi_01'
+
 # ── CAMERA ────────────────────────────────────────────────────────────────
-CAMERA_INDEX    = 1
-CAMERA_WIDTH    = 640
-CAMERA_HEIGHT   = 480
-CAMERA_FPS      = 30
-FLIP_HORIZONTAL = True    # mirror like a selfie cam
-PROCESS_EVERY_N = 4       # run recognition every Nth frame (saves CPU)
+CAMERA_SOURCE    = 0          # 0 = USB camera, 1 = Pi Camera CSI (picamera2)
+CAMERA_WIDTH     = 640
+CAMERA_HEIGHT    = 480
+CAMERA_FPS       = 30
+FLIP_HORIZONTAL  = True
+PROCESS_EVERY_N  = 4
+
+# ── PI CAMERA CSI (picamera2) ─────────────────────────────────────────────
+PI_CAMERA_ENABLED      = False    # True = use picamera2, False = use cv2.VideoCapture
+PI_CAMERA_SENSOR_MODE  = 0        # 0 = full FoV, 1 = 2x2 binned
+PI_CAMERA_AF_MODE      = 'continuous'  # 'manual' | 'continuous' | 'auto'
+
+# ── IR ILLUMINATOR ────────────────────────────────────────────────────────
+IR_ILLUMINATOR_ENABLED = True
+IR_ILLUMINATOR_PIN     = 18       # GPIO for IR LED board (PWM-capable pin)
+IR_ILLUMINATOR_BRIGHTNESS = 100   # 0-100% PWM duty
+
+# ── LIGHT SENSOR ───────────────────────────────────────────────────────────
+LIGHT_SENSOR_ENABLED   = True
+LIGHT_SENSOR_PIN       = 25       # GPIO for digital light sensor DO pin (LOW=dark)
+LIGHT_SENSOR_DARK_THRESHOLD = 30  # seconds after sunset approximation (fallback)
 
 # ── FACE RECOGNITION ──────────────────────────────────────────────────────
 FACES_DIR             = 'faces'
-RECOGNITION_TOLERANCE = 0.50   # 0.40 = very strict, 0.55 = relaxed
-MIN_FACE_SIZE         = 55     # px — ignore tiny/far faces
-
-# How many consecutive unrecognised frames before "unknown" triggers
+RECOGNITION_TOLERANCE = 0.50
+MIN_FACE_SIZE         = 55
 UNKNOWN_HOLD_FRAMES   = 10
-
-# How many consecutive un-encodable frames before "show face" triggers
-# Higher = more tolerant of slight head movements (was causing false positives)
-LOOKASIDE_HOLD_FRAMES = 18    # ~18 × PROCESS_EVERY_N frames ≈ 2–3 seconds
-
-# Cooldown between "please face camera" announcements (seconds)
+LOOKASIDE_HOLD_FRAMES = 18
 LOOKASIDE_COOLDOWN    = 8
-
-# Cooldown between full recognition triggers (seconds)
 TRIGGER_COOLDOWN      = 14
 
 # ── DOOR ──────────────────────────────────────────────────────────────────
-DOOR_RELAY_PIN    = 17
+DOOR_RELAY_PIN  = 17
 DOOR_OPEN_SECONDS = 5
-RELAY_ACTIVE_LOW  = True
+RELAY_ACTIVE_LOW = True
 
-# ── PIR SENSOR (optional) ─────────────────────────────────────────────────
+# ── PIR SENSOR ────────────────────────────────────────────────────────────
 PIR_ENABLED = False
 PIR_PIN     = 24
 
 # ── SPEECH ────────────────────────────────────────────────────────────────
 MIC_DEVICE_INDEX = None
-MIC_ALSA_DEVICE  = ''     # e.g. 'plughw:1,0' — empty = auto-detect
-LISTEN_TIMEOUT   = 12     # seconds — increased so person has time to speak
+MIC_ALSA_DEVICE  = ''
+LISTEN_TIMEOUT   = 12
 SPEECH_LANG      = 'bn-IN'
 
 # ── AUDIO ─────────────────────────────────────────────────────────────────
@@ -56,44 +76,169 @@ TTS_LANG     = 'bn'
 AUDIO_VOLUME = 0.9
 
 # ── CAMERA STREAMING ──────────────────────────────────────────────────────
-STREAM_CAMERA_TO_DECK = True   # stream frames to Web Deck browser
+STREAM_CAMERA_TO_DECK = True
 
 # ── DISPLAY ───────────────────────────────────────────────────────────────
-# Initial window size — orientation is auto-detected at runtime.
-# On Pi portrait display use 720×1280; on laptop use 1280×720.
-DISPLAY_WIDTH   = 720
-DISPLAY_HEIGHT  = 1280
-FULLSCREEN      = True         # True on Pi with monitor, False for testing
-SHOW_FPS        = True
+DISPLAY_WIDTH  = 720
+DISPLAY_HEIGHT = 1280
+FULLSCREEN     = True
+SHOW_FPS       = True
+HEADLESS       = False    # True = no display, run as daemon
 
 # ── COLOURS ───────────────────────────────────────────────────────────────
-COL_BG     = (3,    8,   16)
-COL_PANEL  = (7,   15,   28)
-COL_PANEL2 = (10,  21,   40)
-COL_CYAN   = (0,  255,  229)
-COL_GREEN  = (0,  255,  136)
-COL_RED    = (255,  0,   60)
-COL_YELLOW = (255, 230,   0)
-COL_TEXT   = (184, 221,  240)
-COL_MUTED  = (58,   96,  128)
-COL_DIM    = (10,   24,   40)
-COL_WHITE  = (255, 255,  255)
+COL_BG     = (10,   2,   16)
+COL_PANEL  = (20,   5,   35)
+COL_PANEL2 = (30,  10,   50)
+COL_CYAN   = (0,  255,  255)
+COL_GREEN  = (57, 255,   20)
+COL_RED    = (255,  0,  127)
+COL_YELLOW = (255, 255,   0)
+COL_PURPLE = (188, 19,  254)
+COL_TEXT   = (200, 230,  255)
+COL_MUTED  = (90,   80,  120)
+COL_DIM    = (15,    5,   25)
+COL_WHITE  = (255, 255, 255)
 
 # ── OTP ───────────────────────────────────────────────────────────────────
-# OTP is triggered ONLY when Nobody Home mode is ON + unknown face detected
-OTP_EXPIRY_SECONDS  = 90    # how long OTP stays valid
-OTP_MAX_ATTEMPTS    = 3     # wrong attempts before lockout
-OTP_LOCKOUT_SECONDS = 120   # lockout duration after max wrong attempts
-
-# When Nobody Home is ON, known faces send an approval request via Firebase
-# instead of auto-opening the door. Set False to fall back to OTP for known faces too.
+OTP_EXPIRY_SECONDS         = 90
+OTP_MAX_ATTEMPTS           = 3
+OTP_LOCKOUT_SECONDS        = 120
 KNOWN_FACE_BYPASS_NOBODY_HOME = True
 
-# ── PATHS ─────────────────────────────────────────────────────────────────
-BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-FACES_PATH  = os.path.join(BASE_DIR, FACES_DIR)
-SOUNDS_PATH = os.path.join(BASE_DIR, SOUNDS_DIR)
-LOGS_PATH   = os.path.join(BASE_DIR, 'logs')
+# ── TIMER CODES ───────────────────────────────────────────────────────────
+TIMER_CODE_DEFAULT_SECONDS = 300   # 5 min default for timer-set codes
 
+# ── AUTO-LOCK ─────────────────────────────────────────────────────────────
+AUTO_LOCK_ENABLED      = True
+AUTO_LOCK_DELAY_SECONDS = 15    # door locks N seconds after unlock
+
+# ── PASSAGE MODE ──────────────────────────────────────────────────────────
+PASSAGE_MODE_ENABLED   = True   # allow toggling passage mode
+PASSAGE_MODE_DEFAULT   = False
+
+# ── DUAL AUTH (face + OTP) ───────────────────────────────────────────────
+DUAL_AUTH_ENABLED      = False  # master switch
+DUAL_AUTH_ALWAYS       = False  # require OTP even for known faces
+DUAL_AUTH_KNOWN_ONLY   = True   # only require OTP when nobody_home + known
+
+# ── TAMPER ALARM ──────────────────────────────────────────────────────────
+TAMPER_ENABLED        = True
+TAMPER_PIN            = 23      # GPIO for vibration/reed switch (NC, GND when closed)
+TAMPER_ALARM_SECONDS  = 15      # alarm duration
+TAMPER_COOLDOWN       = 60      # seconds before re-arming
+TAMPER_ALARM_SOUND    = True
+
+# ── SCHEDULED ACCESS ─────────────────────────────────────────────────────
+SCHEDULE_ENABLED      = True
+SCHEDULE_DENY_MSG     = 'Access not allowed at this time'
+
+# ── OTA UPDATES ──────────────────────────────────────────────────────────
+OTA_ENABLED           = True
+OTA_CHECK_INTERVAL    = 3600    # check every hour
+OTA_REPO_URL          = ''      # e.g. https://github.com/user/secura9
+OTA_BRANCH            = 'main'
+OTA_AUTO_UPDATE       = False   # auto-apply, or just notify
+
+# ── LURKER ALARM ──────────────────────────────────────────────────────────
+LURKER_ALARM_SECONDS   = 30
+LURKER_ALARM_ENABLED   = True
+LURKER_POST_ALARM_CD   = 60
+
+# ── PATHS (computed from defaults, may be overridden below) ──────────────
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+FACES_PATH   = os.path.join(BASE_DIR, FACES_DIR)
+SOUNDS_PATH  = os.path.join(BASE_DIR, SOUNDS_DIR)
+LOGS_PATH    = os.path.join(BASE_DIR, 'logs')
+OTA_PATH     = os.path.join(BASE_DIR, 'ota')
+
+
+# ════════════════════════════════════════════════════════════════════════
+# OVERRIDE LOADER — reads config.json + env vars
+# ════════════════════════════════════════════════════════════════════════
+
+_FILE_CFG = {}
+if os.path.exists(CONFIG_PATH):
+    try:
+        with open(CONFIG_PATH) as _f:
+            _FILE_CFG = json.load(_f)
+    except (json.JSONDecodeError, PermissionError):
+        pass
+
+# If firebase.json exists, point Firebase adapter to it
+if PROVISIONED:
+    os.environ.setdefault('GOOGLE_APPLICATION_CREDENTIALS', FIREBASE_PATH)
+
+# Read device_id
+if os.path.exists(DEVICE_ID_PATH):
+    try:
+        with open(DEVICE_ID_PATH) as _f:
+            _id = _f.read().strip()
+            if _id:
+                DEVICE_ID = _id
+    except PermissionError:
+        pass
+
+# Device ID from config.json
+if not PROVISIONED:
+    _did = _FILE_CFG.get('device_id', '')
+    if _did:
+        DEVICE_ID = _did
+
+
+def _apply_overrides(src, prefix=''):
+    """Apply flat or nested overrides to module globals."""
+    _g = globals()
+    for _key, _val in src.items():
+        _py_key = prefix + _key.upper()
+        if _py_key in _g:
+            _existing = _g[_py_key]
+            if isinstance(_existing, bool):
+                _g[_py_key] = str(_val).lower() in ('true', '1', 'yes')
+            elif isinstance(_existing, int):
+                _g[_py_key] = int(_val)
+            elif isinstance(_existing, float):
+                _g[_py_key] = float(_val)
+            elif isinstance(_existing, tuple):
+                _g[_py_key] = tuple(int(x.strip()) for x in str(_val).strip('()').split(','))
+            else:
+                _g[_py_key] = _val
+
+
+# Apply flat config.json overrides (top-level keys like "camera_source")
+_apply_overrides(_FILE_CFG)
+
+# Apply nested config.json overrides (e.g. {"camera": {"source": 0}} )
+for _section, _values in _FILE_CFG.items():
+    if isinstance(_values, dict):
+        _apply_overrides(_values, prefix=_section.upper() + '_')
+
+# Apply env var overrides (SECURA9_DISPLAY_WIDTH=1024)
+for _env_key, _env_val in os.environ.items():
+    if _env_key.startswith('SECURA9_'):
+        _py_key = _env_key[8:]
+        if _py_key in globals():
+            _existing = globals()[_py_key]
+            if isinstance(_existing, bool):
+                globals()[_py_key] = _env_val.lower() in ('true', '1', 'yes')
+            elif isinstance(_existing, int):
+                globals()[_py_key] = int(_env_val)
+            elif isinstance(_existing, float):
+                globals()[_py_key] = float(_env_val)
+            elif isinstance(_existing, tuple):
+                globals()[_py_key] = tuple(int(x.strip()) for x in _env_val.strip('()').split(','))
+            else:
+                globals()[_py_key] = _env_val
+
+# Recompute derived values after overrides
+SERVER_WS_URL   = f'ws://{SERVER_IP}:{SERVER_PORT}/ws?type=device'
+SERVER_HTTP_URL = f'http://{SERVER_IP}:{SERVER_PORT}'
+FACES_PATH      = os.path.join(BASE_DIR, FACES_DIR)
+SOUNDS_PATH     = os.path.join(BASE_DIR, SOUNDS_DIR)
+LOGS_PATH       = os.path.join(BASE_DIR, 'logs')
+
+# ── Ensure data dirs exist ────────────────────────────────────────────────
 for _d in [FACES_PATH, SOUNDS_PATH, LOGS_PATH]:
     os.makedirs(_d, exist_ok=True)
+
+# Cleanup internal helpers
+del _FILE_CFG, _apply_overrides

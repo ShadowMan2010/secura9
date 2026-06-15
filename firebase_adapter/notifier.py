@@ -74,6 +74,22 @@ class Notifier:
         if self._fb_ok:
             self._fb.send_lurker_alert()
 
+    def send_tamper_alarm(self) -> None:
+        if self._fb_ok:
+            self._fb.send_tamper_alarm()
+
+    def send_passage_on(self) -> None:
+        if self._fb_ok:
+            self._fb.send_passage_on()
+
+    def send_passage_off(self) -> None:
+        if self._fb_ok:
+            self._fb.send_passage_off()
+
+    def send_ota_update_available(self, version: str = '') -> None:
+        if self._fb_ok:
+            self._fb.send_ota_update_available(version)
+
     def set_firebase_callbacks(
         self,
         on_approve: Optional[Callable] = None,

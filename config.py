@@ -24,12 +24,27 @@ SERVER_HTTP_URL = f'http://{SERVER_IP}:{SERVER_PORT}'
 DEVICE_ID       = 'secura9_pi_01'
 
 # ── CAMERA ────────────────────────────────────────────────────────────────
-CAMERA_SOURCE    = 0
+CAMERA_SOURCE    = 0          # 0 = USB camera, 1 = Pi Camera CSI (picamera2)
 CAMERA_WIDTH     = 640
 CAMERA_HEIGHT    = 480
 CAMERA_FPS       = 30
 FLIP_HORIZONTAL  = True
 PROCESS_EVERY_N  = 4
+
+# ── PI CAMERA CSI (picamera2) ─────────────────────────────────────────────
+PI_CAMERA_ENABLED      = False    # True = use picamera2, False = use cv2.VideoCapture
+PI_CAMERA_SENSOR_MODE  = 0        # 0 = full FoV, 1 = 2x2 binned
+PI_CAMERA_AF_MODE      = 'continuous'  # 'manual' | 'continuous' | 'auto'
+
+# ── IR ILLUMINATOR ────────────────────────────────────────────────────────
+IR_ILLUMINATOR_ENABLED = True
+IR_ILLUMINATOR_PIN     = 18       # GPIO for IR LED board (PWM-capable pin)
+IR_ILLUMINATOR_BRIGHTNESS = 100   # 0-100% PWM duty
+
+# ── LIGHT SENSOR ───────────────────────────────────────────────────────────
+LIGHT_SENSOR_ENABLED   = True
+LIGHT_SENSOR_PIN       = 25       # GPIO for digital light sensor DO pin (LOW=dark)
+LIGHT_SENSOR_DARK_THRESHOLD = 30  # seconds after sunset approximation (fallback)
 
 # ── FACE RECOGNITION ──────────────────────────────────────────────────────
 FACES_DIR             = 'faces'
@@ -90,6 +105,40 @@ OTP_MAX_ATTEMPTS           = 3
 OTP_LOCKOUT_SECONDS        = 120
 KNOWN_FACE_BYPASS_NOBODY_HOME = True
 
+# ── TIMER CODES ───────────────────────────────────────────────────────────
+TIMER_CODE_DEFAULT_SECONDS = 300   # 5 min default for timer-set codes
+
+# ── AUTO-LOCK ─────────────────────────────────────────────────────────────
+AUTO_LOCK_ENABLED      = True
+AUTO_LOCK_DELAY_SECONDS = 15    # door locks N seconds after unlock
+
+# ── PASSAGE MODE ──────────────────────────────────────────────────────────
+PASSAGE_MODE_ENABLED   = True   # allow toggling passage mode
+PASSAGE_MODE_DEFAULT   = False
+
+# ── DUAL AUTH (face + OTP) ───────────────────────────────────────────────
+DUAL_AUTH_ENABLED      = False  # master switch
+DUAL_AUTH_ALWAYS       = False  # require OTP even for known faces
+DUAL_AUTH_KNOWN_ONLY   = True   # only require OTP when nobody_home + known
+
+# ── TAMPER ALARM ──────────────────────────────────────────────────────────
+TAMPER_ENABLED        = True
+TAMPER_PIN            = 23      # GPIO for vibration/reed switch (NC, GND when closed)
+TAMPER_ALARM_SECONDS  = 15      # alarm duration
+TAMPER_COOLDOWN       = 60      # seconds before re-arming
+TAMPER_ALARM_SOUND    = True
+
+# ── SCHEDULED ACCESS ─────────────────────────────────────────────────────
+SCHEDULE_ENABLED      = True
+SCHEDULE_DENY_MSG     = 'Access not allowed at this time'
+
+# ── OTA UPDATES ──────────────────────────────────────────────────────────
+OTA_ENABLED           = True
+OTA_CHECK_INTERVAL    = 3600    # check every hour
+OTA_REPO_URL          = ''      # e.g. https://github.com/user/secura9
+OTA_BRANCH            = 'main'
+OTA_AUTO_UPDATE       = False   # auto-apply, or just notify
+
 # ── LURKER ALARM ──────────────────────────────────────────────────────────
 LURKER_ALARM_SECONDS   = 30
 LURKER_ALARM_ENABLED   = True
@@ -100,6 +149,7 @@ BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 FACES_PATH   = os.path.join(BASE_DIR, FACES_DIR)
 SOUNDS_PATH  = os.path.join(BASE_DIR, SOUNDS_DIR)
 LOGS_PATH    = os.path.join(BASE_DIR, 'logs')
+OTA_PATH     = os.path.join(BASE_DIR, 'ota')
 
 
 # ════════════════════════════════════════════════════════════════════════

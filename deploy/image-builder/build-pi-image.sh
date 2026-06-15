@@ -19,7 +19,7 @@ err()   { echo -e "${RED}[ERR]${NC}   $*" >&2; }
 
 OUT_DIR="${1:-./build}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # ── Requirements ───────────────────────────────────────────────────────────
 
@@ -111,6 +111,84 @@ rsync -a --delete \
     --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
     --exclude='logs' --exclude='faces' --exclude='clips' --exclude='snapshots' \
     "$REPO_DIR/" "$ROOT_MNT/opt/secura9/"
+
+# Install Plymouth boot splash
+info "Installing SECURA-9 Plymouth theme..."
+chroot "$ROOT_MNT" apt-get update
+chroot "$ROOT_MNT" apt-get install -y plymouth plymouth-label plymouth-theme-spinner
+PLYMOUTH_DIR="$ROOT_MNT/usr/share/plymouth/themes/secura9"
+mkdir -p "$PLYMOUTH_DIR"
+
+cat > "$PLYMOUTH_DIR/secura9.script" << 'SCRIPT'
+Wallpaper.SetWallpaperFunction();
+fun progress_callback (progress) { secura9_progress = progress; }
+fun refresh_callback () {
+    bg_image = Image.Empty();
+    bg_image = bg_image.Autoscale(Window.GetWidth(), Window.GetHeight(), 1, 1);
+    bg_image = bg_image.Fill(0.06, 0.06, 0.10);
+    Wallpaper.SetImage(bg_image);
+    title = Text("SECURA-9");
+    title.SetFontFace("Noto Sans"); title.SetFontBold(true);
+    title.SetFontSize(36); title.SetColor(0.0, 0.85, 0.90);
+    tx = (Window.GetWidth() - title.GetWidth()) / 2;
+    title.SetPosition(tx, Window.GetHeight() * 0.30); title.Draw();
+    subtitle = Text("ACCESS CONTROL SYSTEM");
+    subtitle.SetFontFace("Noto Sans"); subtitle.SetFontSize(14);
+    subtitle.SetColor(0.40, 0.40, 0.50);
+    sx = (Window.GetWidth() - subtitle.GetWidth()) / 2;
+    subtitle.SetPosition(sx, Window.GetHeight() * 0.30 + 48); subtitle.Draw();
+    num_dots = 6; spacing = 40;
+    dw = num_dots * spacing;
+    dx = (Window.GetWidth() - dw) / 2 + spacing / 2;
+    dy = Window.GetHeight() * 0.30 + 100;
+    idx = 0;
+    while (idx < num_dots) {
+        offset = Math.IntrinsicMod((Math.GetTime() * 100 + idx * 60), 600);
+        b = 0.3 + 0.7 * (offset < 300 ? offset : 600 - offset) / 300;
+        dot = Image.Text("●"); dot.SetFontSize(18);
+        dot.SetColor(0.0, b * 0.85, b * 0.90);
+        dot.SetPosition(dx + idx * spacing - dot.GetWidth() / 2, dy); dot.Draw();
+        idx = idx + 1;
+    }
+    bw = Window.GetWidth() * 0.5; bh = 3;
+    bx = (Window.GetWidth() - bw) / 2; by = dy + 60;
+    bb = Image.Rectangle(bw, bh, 1, 1); bb.SetColor(0.15, 0.15, 0.20);
+    bb.SetPosition(bx, by); bb.Draw();
+    fw = bw * secura9_progress;
+    if (fw > 0) {
+        bf = Image.Rectangle(fw, bh, 1, 1); bf.SetColor(0.0, 0.85, 0.90);
+        bf.SetPosition(bx, by); bf.Draw();
+    }
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+Plymouth.SetProgressFunction(progress_callback);
+SCRIPT
+
+cat > "$PLYMOUTH_DIR/secura9.plymouth" << 'META'
+[Plymouth Theme]
+Name=SECURA-9
+Description=Cyberpunk boot splash for SECURA-9 access control
+ModuleName=script
+[script]
+ImageDir=/usr/share/plymouth/themes/secura9
+ScriptFile=/usr/share/plymouth/themes/secura9/secura9.script
+META
+
+chroot "$ROOT_MNT" /bin/bash << 'CHROOT'
+update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
+    /usr/share/plymouth/themes/secura9/secura9.plymouth 200
+update-alternatives --set default.plymouth \
+    /usr/share/plymouth/themes/secura9/secura9.plymouth
+CHROOT
+
+# Enable Plymouth on boot
+cat > "$BOOT_MNT/config.txt.append" << 'CONFIG'
+disable_splash=0
+avoid_warnings=1
+CONFIG
+cat "$BOOT_MNT/config.txt.append" >> "$BOOT_MNT/config.txt" 2>/dev/null || true
+rm -f "$BOOT_MNT/config.txt.append"
+sed -i 's/$/ quiet splash plymouth.ignore-serial-consoles/' "$ROOT_MNT/cmdline.txt" 2>/dev/null || true
 
 # Create firstboot script
 cat > "$ROOT_MNT/usr/lib/raspberrypi-sys-mods/firstboot.d/90-secura9" << 'FIEND'

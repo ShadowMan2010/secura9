@@ -164,10 +164,11 @@ class MicrophoneAudioTrack(AudioStreamTrack):
 
 
 class WebRTCBroadcaster:
-    def __init__(self, db, get_frame_fn, device_id='secura9_pi_01'):
+    def __init__(self, db, get_frame_fn, device_id='secura9_pi_01', on_unlock_request=None):
         self._db = db
         self._get_frame = get_frame_fn
         self._device_id = device_id
+        self._on_unlock_request = on_unlock_request
         self._pc: Optional[RTCPeerConnection] = None
         self._track: Optional[CameraVideoTrack] = None
         self._audio_track: Optional[MicrophoneAudioTrack] = None
@@ -327,6 +328,10 @@ class WebRTCBroadcaster:
                     self._on_viewer_ice_snapshot)
                 log.info(f'WebRTC step: viewerIce listener set for {doc_id}')
 
+                # Listen for unlock requests during the call
+                self._session_id = doc_id
+                self._start_unlock_listener(ref)
+
             self._update_webrtc_status('answering')
             log.info(f'WebRTC answer sent for {doc_id}')
             return True
@@ -334,6 +339,24 @@ class WebRTCBroadcaster:
             log.error(f'WebRTC session {doc_id} failed: {e}', exc_info=True)
             await self._cleanup()
             return False
+
+    def _start_unlock_listener(self, session_ref):
+        def on_session_change(docs, changes, _):
+            for change in changes:
+                if change.type.name == 'MODIFIED':
+                    data = change.document.to_dict()
+                    if data.get('unlockRequest') and not data.get('unlockGranted'):
+                        log.info('Unlock requested during call')
+                        if self._on_unlock_request:
+                            self._on_unlock_request()
+                        try:
+                            session_ref.set({'unlockGranted': True, 'unlockRequest': False},
+                                            merge=True)
+                        except Exception as e:
+                            log.warning(f'Failed to write unlockGranted: {e}')
+
+        self._session_unsub = session_ref.on_snapshot(on_session_change)
+        log.info('Unlock-on-demand listener active')
 
     def _on_viewer_ice_snapshot(self, docs, changes, read_time):
         """Add viewer ICE candidates as they arrive."""
@@ -443,8 +466,8 @@ class WebRTCBroadcaster:
 
 
 class WebRTCThread:
-    def __init__(self, db, get_frame_fn):
-        self._broadcaster = WebRTCBroadcaster(db, get_frame_fn)
+    def __init__(self, db, get_frame_fn, on_unlock_request=None):
+        self._broadcaster = WebRTCBroadcaster(db, get_frame_fn, on_unlock_request=on_unlock_request)
         self._thread = None
         self._loop = None
 

@@ -236,10 +236,84 @@ class FirebaseService:
 
     def send_nobody_home_off(self):
         self.send_notification(
-            notif_type='nobody_home',
-            title='🏠 Nobody Home: OFF',
-            body='Nobody home mode deactivated. Normal operation.',
+            notif_type='system',
+            title='🟢 Nobody-Home Off',
+            body='Normal mode restored',
         )
+
+    def send_tamper_alarm(self):
+        self.send_notification(
+            notif_type='tamper',
+            title='🚨 TAMPER ALARM',
+            body='Intrusion detected at the door!',
+            data={'alarm': 'tamper'}
+        )
+
+    def send_passage_on(self):
+        self.send_notification(
+            notif_type='passage',
+            title='🚪 Passage Mode ON',
+            body='Door will stay unlocked',
+        )
+
+    def send_passage_off(self):
+        self.send_notification(
+            notif_type='passage',
+            title='🚪 Passage Mode OFF',
+            body='Door locked',
+        )
+
+    def send_ota_update_available(self, version: str):
+        self.send_notification(
+            notif_type='ota',
+            title='📦 OTA Update Available',
+            body=f'Version {version} ready to install',
+            data={'otaVersion': version}
+        )
+
+    # ── Timed codes listener ──────────────────────────────────────────────
+
+    def listen_timed_codes(self, on_code_request=None):
+        if not self._initialized:
+            return
+        try:
+            codes_ref = self._db.collection('devices').document(self._device_id) \
+                .collection('timedCodes')
+            codes_ref.on_snapshot(lambda snaps, _: self._handle_timed_codes(snaps, on_code_request))
+            log.info('Timed codes listener started')
+        except Exception as e:
+            log.warning(f'Timed codes listener failed: {e}')
+
+    def _handle_timed_codes(self, snaps, callback):
+        if not callback:
+            return
+        for snap in snaps:
+            if snap.exists:
+                data = snap.to_dict()
+                if data.get('status') == 'pending':
+                    callback(snap.id, data)
+
+    # ── Config listener ──────────────────────────────────────────────────
+
+    def listen_config(self, on_config_update=None):
+        if not self._initialized:
+            return
+        try:
+            config_ref = self._db.collection('devices').document(self._device_id) \
+                .collection('config').document('settings')
+            config_ref.on_snapshot(
+                lambda snap, _: self._handle_config(snap, on_config_update)
+            )
+            log.info('Config listener started')
+        except Exception as e:
+            log.warning(f'Config listener failed: {e}')
+
+    def _handle_config(self, snap, callback):
+        if not callback or not snap.exists:
+            return
+        data = snap.to_dict()
+        if data:
+            callback(data)
 
     def send_otp_accepted(self, name: str):
         self.send_notification(

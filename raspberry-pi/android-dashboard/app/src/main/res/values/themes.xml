@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SECURA9" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0A0210</item>
+        <item name="android:navigationBarColor">#0A0210</item>
+        <item name="android:windowBackground">#0A0210</item>
+    </style>
+    <style name="Theme.SECURA9.Splash" parent="Theme.SECURA9">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

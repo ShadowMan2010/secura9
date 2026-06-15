@@ -64,18 +64,38 @@ def F(size, bold=False):
 
 def _find_bengali_font():
     """Return path to best Bengali font, or None."""
-    for p in [
+    try:
+        import subprocess
+        r = subprocess.run(
+            ['fc-match', '-f', '%{file}', 'sans:lang=bn'],
+            capture_output=True, text=True, timeout=5,
+        )
+        p = r.stdout.strip()
+        if p and os.path.exists(p):
+            return p
+    except Exception:
+        pass
+    alt = [
         '/usr/share/fonts/truetype/noto/NotoSansBengaliUI-Regular.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansBengaliUI-Bold.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansBengali-Bold.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansBengaliUI-Medium.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansBengaliUI-SemiBold.ttf',
+        '/usr/share/fonts/truetype/noto/NotoSansBengaliUI-Light.ttf',
         '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-    ]:
+    ]
+    for p in alt:
         if os.path.exists(p):
             return p
+    try:
+        for root, dirs, files in os.walk('/usr/share/fonts'):
+            for f in files:
+                if 'bengali' in f.lower() or 'notosansbn' in f.lower():
+                    return os.path.join(root, f)
+    except Exception:
+        pass
     return None
 
 _BN_FONT_PATH = _find_bengali_font()
@@ -110,7 +130,7 @@ class Particle:
         self.vx  = random.uniform(-0.15, 0.15)
         self.life     = random.uniform(0.5, 1.0)
         self.max_life = self.life
-        self.col = random.choice([(0,255,229),(0,200,180),(0,255,136)])
+        self.col = random.choice([(0,255,229),(0,200,180),(0,255,136),(188,19,254)])
 
     def update(self, dt):
         self.x += self.vx
@@ -127,6 +147,45 @@ class Particle:
                                   (*self.col, a))
         except Exception:
             pass
+
+
+# ── Matrix Rain ────────────────────────────────────────────────────────────
+class MatrixDrop:
+    def __init__(self, w, h):
+        self._w = w
+        self._h = h
+        self.reset()
+
+    def reset(self):
+        self.x = random.randint(0, self._w)
+        self.y = -random.randint(0, self._h)
+        self.speed = random.uniform(3, 8)
+        self.length = random.randint(8, 20)
+        self.chars = [random.choice('0123456789ABCDEF') for _ in range(self.length)]
+        self.brightness = random.uniform(0.4, 1.0)
+
+    def update(self, dt):
+        self.y += self.speed
+        if self.y > self._h + self.length * 12:
+            self.reset()
+
+    def draw(self, surf):
+        for i, c in enumerate(self.chars):
+            cy = self.y - i * 12
+            if cy < 0 or cy > self._h:
+                continue
+            if i == 0:
+                col = (200, 255, 200, int(200 * self.brightness))
+            elif i < 4:
+                col = (57, 255, 20, int(180 * self.brightness))
+            else:
+                col = (57, 255, 20, int(80 * self.brightness))
+            try:
+                s = F(10).render(c, True, col[:3])
+                s.set_alpha(col[3])
+                surf.blit(s, (self.x, cy))
+            except Exception:
+                pass
 
 
 # ── Waveform helper ───────────────────────────────────────────────────────
@@ -178,7 +237,9 @@ class Display:
     OTP_ENTER   = 'otp_enter'
     OTP_WRONG   = 'otp_wrong'
     OTP_EXPIRED = 'otp_expired'
-
+    PASSAGE     = 'passage'
+    DUAL_AUTH   = 'dual_auth'
+    ALARM       = 'alarm'
     def __init__(self):
         self._state    = self.BOOT
         self._lock     = threading.Lock()
@@ -207,6 +268,17 @@ class Display:
         # Scanning line y position (only inside camera area)
         self._scan_y = 0
 
+        # Glitch effect state
+        self._glitch_t = 0.0
+        self._glitch_active = False
+
+        # Matrix rain
+        self._matrix_drops = []
+        self._crt_surf = None  # scanline overlay
+
+        # HUD "hacking" text scroll
+        self._hack_scroll = 0.0
+
         # OTP numpad state
         self._otp_display     = ''
         self._otp_expiry      = 0
@@ -223,6 +295,11 @@ class Display:
         self._cam_ok        = True
         self._webrtc_ok     = False
         self._door_locked   = True
+        self._passage_active = False
+
+        # Dual auth
+        self._dual_auth_name = ''
+        self._dual_auth_conf = 0.0
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -286,11 +363,24 @@ class Display:
         self._otp_digits = ''
         self._otp_submitted = False
 
-    def set_status(self, fb=None, cam=None, webrtc=None, door_locked=None):
+    def show_passage(self, active=True):
+        self._passage_active = active
+        self._set(self.PASSAGE)
+
+    def show_dual_auth(self, name='', confidence=0.0):
+        self._dual_auth_name = name
+        self._dual_auth_conf = confidence
+        self._set(self.DUAL_AUTH)
+
+    def show_alarm(self):
+        self._set(self.ALARM)
+
+    def set_status(self, fb=None, cam=None, webrtc=None, door_locked=None, passage=None):
         if fb is not None:      self._fb_ok = fb
         if cam is not None:     self._cam_ok = cam
         if webrtc is not None:  self._webrtc_ok = webrtc
         if door_locked is not None: self._door_locked = door_locked
+        if passage is not None: self._passage_active = passage
 
     def update_camera(self, frame_bgr, face_boxes=None):
         if frame_bgr is None:
@@ -302,8 +392,8 @@ class Display:
             with self._lock:
                 self._cam_surf  = surf
                 self._face_boxes = [
-                    (b[0], b[1], b[2], b[3],
-                     b[4] if len(b) > 4 else 90)
+                    b if len(b) > 5 else (b[0], b[1], b[2], b[3],
+                     b[4] if len(b) > 4 else 90, '')
                     for b in (face_boxes or [])
                 ]
         except Exception as e:
@@ -346,37 +436,88 @@ class Display:
 
         self._scan_y = self._hud_h
         self._particles = [Particle(self._w, self._h) for _ in range(50)]
+        self._matrix_drops = [MatrixDrop(self._w, self._h) for _ in range(30)]
+        self._crt_surf = self._make_crt_overlay()
 
-        log.info(f'Display {self._w}×{self._h} '
-                 f'{"portrait" if self._is_portrait else "landscape"}'
-                 f'  cam={self._cam_w}×{self._cam_h}  '
-                 f'panel={self._panel_w}×{self._panel_h}')
+    # ── Headless helpers ──────────────────────────────────────────────────
+
+    def _compute_headless_layout(self):
+        self._w = config.DISPLAY_WIDTH
+        self._h = config.DISPLAY_HEIGHT
+        self._is_portrait = self._h > self._w
+        self._hud_h = 38
+
+    def _run_headless(self):
+        log.info('Running headless — waiting for shutdown')
+        while self._running:
+            time.sleep(0.5)
+        log.info('Headless loop ended')
 
     # ── Main loop ─────────────────────────────────────────────────────────
 
     def run(self):
-        pygame.init()
+        self._running = True
+
+        if config.HEADLESS:
+            log.info('HEADLESS mode — display loop skipped')
+            self._compute_headless_layout()
+            self._run_headless()
+            return
+
+        try:
+            pygame.init()
+        except Exception as e:
+            log.warning(f'pygame.init() failed: {e} — falling back to headless')
+            self._compute_headless_layout()
+            self._run_headless()
+            return
+
         pygame.mouse.set_visible(True)
 
         flags = (pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
                  if config.FULLSCREEN else 0)
-        self._scr = pygame.display.set_mode(
-            (config.DISPLAY_WIDTH, config.DISPLAY_HEIGHT), flags
-        )
+        try:
+            self._scr = pygame.display.set_mode(
+                (config.DISPLAY_WIDTH, config.DISPLAY_HEIGHT), flags
+            )
+        except pygame.error as e:
+            log.warning(f'pygame.display.set_mode failed: {e} — falling back to headless')
+            pygame.quit()
+            self._compute_headless_layout()
+            self._run_headless()
+            return
+
         pygame.display.set_caption('SECURA-9')
         self._compute_layout()
         clk = pygame.time.Clock()
-        self._running = True
 
         # Pre-bake hex-grid background
         self._bg = self._make_bg()
+
+        # Bengali rendering diagnostic
+        if _BN_FONT_PATH:
+            log.info(f'Bengali font: {_BN_FONT_PATH}')
+        else:
+            log.warning('No Bengali font found — Bengali text will not render')
+            log.warning('Install: sudo apt install fonts-noto-extra')
+        try:
+            from PIL import features
+            if features.check('raqm'):
+                log.info('Pillow raqm available — Bengali shaping enabled')
+            else:
+                log.warning('Pillow raqm NOT available — Bengali shaping may be broken')
+                log.warning('Install: sudo apt install libraqm0')
+        except ImportError:
+            log.warning('Pillow not available — Bengali rendering fallback active')
+            log.warning('Install: pip install Pillow')
 
         while self._running:
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
                     self._running = False
                 if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_ESCAPE: self._running = False
+                    if ev.key == pygame.K_ESCAPE:
+                        self._running = False
                     if ev.key == pygame.K_F11:    pygame.display.toggle_fullscreen()
                 if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                     self._handle_numpad_click(*ev.pos)
@@ -403,26 +544,44 @@ class Display:
                 p.draw(ps)
             self._scr.blit(ps, (0, 0))
 
-            # Always draw these fixed sections first
-            self._draw_camera_section()
+            # Matrix rain — full screen during boot, corners only otherwise
+            if self._matrix_drops:
+                ms = pygame.Surface((self._w, self._h), pygame.SRCALPHA)
+                for d in self._matrix_drops:
+                    d.update(dt)
+                    if self._state == self.BOOT or d.x < self._w // 4 or d.x > self._w * 3 // 4:
+                        d.draw(ms)
+                self._scr.blit(ms, (0, 0))
 
-            # Then the state-driven bottom panel
-            s = self._state
-            if   s == self.BOOT:        self._panel_boot()
-            elif s == self.IDLE:        self._panel_idle()
-            elif s == self.NEW_FACE:    self._panel_new_face()
-            elif s == self.WAITING:     self._panel_waiting()
-            elif s == self.GRANTED:     self._panel_granted()
-            elif s == self.DENIED:      self._panel_denied()
-            elif s == self.NOBODY_HOME: self._panel_nobody_home()
-            elif s == self.MESSAGE:     self._panel_message()
-            elif s == self.OTP_WAITING: self._panel_otp_waiting()
-            elif s == self.OTP_ENTER:   self._panel_otp_enter()
-            elif s == self.OTP_WRONG:   self._panel_otp_wrong()
-            elif s == self.OTP_EXPIRED: self._panel_otp_expired()
+            if self._state == self.BOOT:
+                self._draw_boot_animation()
+            else:
+                self._draw_camera_section()
 
-            # HUD bar always on top
-            self._draw_hud()
+                s = self._state
+                if   s == self.IDLE:        self._panel_idle()
+                elif s == self.NEW_FACE:    self._panel_new_face()
+                elif s == self.WAITING:     self._panel_waiting()
+                elif s == self.GRANTED:     self._panel_granted()
+                elif s == self.DENIED:      self._panel_denied()
+                elif s == self.NOBODY_HOME: self._panel_nobody_home()
+                elif s == self.MESSAGE:     self._panel_message()
+                elif s == self.OTP_WAITING: self._panel_otp_waiting()
+                elif s == self.OTP_ENTER:   self._panel_otp_enter()
+                elif s == self.OTP_WRONG:   self._panel_otp_wrong()
+                elif s == self.OTP_EXPIRED: self._panel_otp_expired()
+                elif s == self.PASSAGE:     self._panel_passage()
+                elif s == self.DUAL_AUTH:   self._panel_dual_auth()
+                elif s == self.ALARM:       self._panel_alarm()
+
+            # CRT scanline overlay (subtle)
+            if self._crt_surf:
+                self._scr.blit(self._crt_surf, (0, 0))
+
+            if self._state != self.BOOT:
+                self._draw_hud()
+                if random.random() < 0.03 or self._glitch_active:
+                    self._draw_glitch()
 
             if config.SHOW_FPS:
                 fs = F(10).render(f'{clk.get_fps():.0f}fps', True, config.COL_MUTED)
@@ -432,6 +591,106 @@ class Display:
 
         pygame.quit()
         log.info('Display closed')
+
+    def _draw_cyber_overlay(self, x, y, w, h):
+        fs = 8
+        col = (*config.COL_CYAN, 120)
+        
+        # Detect if camera has objects in it (check boxes)
+        has_person = any(b[5] == 'person' for b in self._face_boxes) if self._face_boxes else False
+
+        # Left side data
+        lines = [
+            f"SEC_LVL: ALPHA-9",
+            f"NET_STAT: {'CONNECTED' if self._fb_ok else 'OFFLINE'}",
+            f"AI: {'ACTIVE' if hasattr(config, 'OBJECT_DETECTION_ENABLED') and config.OBJECT_DETECTION_ENABLED else 'OFF'}",
+            f"PERSON: {'YES' if has_person else 'NO'}",
+        ]
+        for i, line in enumerate(lines):
+            base_col = config.COL_GREEN if ('YES' in line or 'ACTIVE' in line) else config.COL_CYAN
+            lcol = (*base_col, 120)
+            self._tl(line, fs, lcol, x + 5, y + 25 + i * 12)
+
+        # Right side data (hex strings)
+        for i in range(4):
+            hex_str = "".join(random.choice("0123456789ABCDEF") for _ in range(6))
+            self._tr(f"0x{hex_str}", fs, col, x + w - 5, y + 25 + i * 12)
+
+        # Bottom info
+        obj_count = len(self._face_boxes)
+        if obj_count:
+            self._tl(f"TRACK: {obj_count} OBJ  |  COORD: {random.random()*180:.4f}N",
+                      fs, col, x + 5, y + h - 15)
+        else:
+            self._tl(f"SCANNING | COORD: {random.random()*180:.4f}N / {random.random()*180:.4f}E",
+                      fs, col, x + 5, y + h - 15)
+        
+    def _draw_glitch(self):
+        if not hasattr(self, '_glitch_active'): return
+        if not self._glitch_active:
+            if random.random() < 0.05:
+                self._glitch_active = True
+                self._glitch_t = time.time() + random.uniform(0.1, 0.3)
+            else:
+                return
+
+        if time.time() > self._glitch_t:
+            self._glitch_active = False
+            return
+
+        # Simple glitch: offset some horizontal slices
+        sw, sh = self._scr.get_size()
+        for _ in range(random.randint(2, 5)):
+            h = random.randint(5, 30)
+            max_y = max(0, sh - h)
+            y = random.randint(0, max_y) if max_y > 0 else 0
+            off = random.randint(-20, 20)
+            slice_rect = pygame.Rect(0, y, sw, h)
+            try:
+                sub = self._scr.subsurface(slice_rect).copy()
+            except ValueError:
+                continue
+            self._scr.blit(sub, (off, y))
+            
+            # Add some random color tint to the slice
+            if random.random() < 0.5:
+                tint = pygame.Surface((sw, h), pygame.SRCALPHA)
+                tint.fill((*random.choice([config.COL_RED, config.COL_CYAN, config.COL_PURPLE]), 40))
+                self._scr.blit(tint, (off, y))
+
+    def _make_crt_overlay(self):
+        s = pygame.Surface((self._w, self._h), pygame.SRCALPHA)
+        for y in range(0, self._h, 3):
+            pygame.draw.line(s, (0, 0, 0, 15), (0, y), (self._w, y))
+        # Vignette
+        for r in range(max(self._w, self._h) // 2, 0, -1):
+            a = int(8 * (1 - r / (max(self._w, self._h) // 2)))
+            if a <= 0: continue
+            pygame.draw.ellipse(s, (0, 0, 0, a),
+                                (self._w//2 - r, self._h//2 - r, r*2, r*2), 0)
+        return s
+
+    def _draw_cyber_divider(self, x, y, w, col=None):
+        col = col or config.COL_CYAN
+        pygame.draw.line(self._scr, col, (x, y), (x + w, y), 1)
+        pygame.draw.line(self._scr, (*col, 40), (x, y - 1), (x + w, y - 1), 1)
+        # End caps
+        pygame.draw.circle(self._scr, col, (x, y), 2)
+        pygame.draw.circle(self._scr, col, (x + w, y), 2)
+
+    def _draw_cyber_text(self, text, size, col, x, y, glitch=False):
+        if glitch and random.random() < 0.1:
+            off = random.randint(-2, 2)
+            rcol = (col[0], 0, 0, 180)
+            try:
+                s = F(size).render(str(text), True, rcol[:3])
+                s.set_alpha(rcol[3])
+                self._scr.blit(s, (x + off, y))
+            except Exception: pass
+        try:
+            s = F(size).render(str(text), True, col)
+            self._scr.blit(s, (x, y))
+        except Exception: pass
 
     # ── Internal ──────────────────────────────────────────────────────────
 
@@ -462,12 +721,31 @@ class Display:
             fp = _BN_FONT_PATH or '/usr/share/fonts/truetype/noto/NotoSansBengaliUI-Regular.ttf'
             if os.path.exists(fp):
                 font = ImageFont.truetype(fp, sz)
-                bbox = font.getbbox(str(txt))
-                tw = bbox[2] - bbox[0]
-                th = bbox[3] - bbox[1]
-                img = Image.new('RGBA', (tw or 1, th or 1), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(img)
-                draw.text((-bbox[0], -bbox[1]), str(txt), font=font, fill=(*col, 255))
+                try:
+                    from PIL import features
+                    if features.check('raqm'):
+                        bbox = font.getbbox(str(txt), language='bn')
+                        tw = bbox[2] - bbox[0]
+                        th = bbox[3] - bbox[1]
+                        img = Image.new('RGBA', (tw or 1, th or 1), (0, 0, 0, 0))
+                        draw = ImageDraw.Draw(img)
+                        draw.text((-bbox[0], -bbox[1]), str(txt), font=font,
+                                   fill=(*col, 255), language='bn', direction='ltr')
+                    else:
+                        bbox = font.getbbox(str(txt))
+                        tw = bbox[2] - bbox[0]
+                        th = bbox[3] - bbox[1]
+                        img = Image.new('RGBA', (tw or 1, th or 1), (0, 0, 0, 0))
+                        draw = ImageDraw.Draw(img)
+                        draw.text((-bbox[0], -bbox[1]), str(txt), font=font,
+                                   fill=(*col, 255))
+                except Exception:
+                    bbox = font.getbbox(str(txt))
+                    tw = bbox[2] - bbox[0]
+                    th = bbox[3] - bbox[1]
+                    img = Image.new('RGBA', (tw or 1, th or 1), (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(img)
+                    draw.text((-bbox[0], -bbox[1]), str(txt), font=font, fill=(*col, 255))
                 raw = img.tobytes()
                 surf = pygame.image.fromstring(raw, img.size, 'RGBA')
                 self._scr.blit(surf, (cx - tw // 2, cy - th // 2))
@@ -525,20 +803,22 @@ class Display:
 
     # ── HUD top bar ───────────────────────────────────────────────────────
     def _draw_hud(self):
-        """
-        HUD bar:
-        [DATE dd/mm/yy] [● ● ●] [LOCKED] [HH:MM:SS] [UP 2h14m]
-        """
         H_BAR = self._hud_h
         W_SCR = self._w
         cy = H_BAR // 2
         fs = 11
         bold = True
 
-        pygame.draw.rect(self._scr, config.COL_PANEL, (0, 0, W_SCR, H_BAR))
-        pygame.draw.line(self._scr, config.COL_CYAN,  (0, H_BAR), (W_SCR, H_BAR), 1)
-        pygame.draw.line(self._scr, (*config.COL_CYAN, 40),
-                          (0, H_BAR-1), (W_SCR, H_BAR-1), 1)
+        # Cyberpunk gradient bar
+        for i in range(H_BAR):
+            t = i / H_BAR
+            c = tuple(int(a * (1 - t * 0.6)) for a in config.COL_PANEL)
+            pygame.draw.line(self._scr, c, (0, i), (W_SCR, i))
+
+        # Double neon line at bottom
+        pygame.draw.line(self._scr, config.COL_CYAN, (0, H_BAR), (W_SCR, H_BAR), 1)
+        pygame.draw.line(self._scr, (*config.COL_PURPLE, 50),
+                          (0, H_BAR-2), (W_SCR, H_BAR-2), 1)
 
         # DATE on the left
         date_str = time.strftime('%d/%m/%y')
@@ -546,20 +826,21 @@ class Display:
         self._scr.blit(ds, (10, cy - ds.get_height() // 2))
         x = 10 + ds.get_width() + 8
 
-        # Status dots: Firebase ● Camera ● WebRTC
-        colors = [
-            config.COL_GREEN if self._fb_ok else config.COL_RED,
-            config.COL_GREEN if self._cam_ok else config.COL_RED,
-            config.COL_GREEN if self._webrtc_ok else config.COL_YELLOW,
+        # Status dots with labels
+        status_items = [
+            ('FB', config.COL_GREEN if self._fb_ok else config.COL_RED),
+            ('CAM', config.COL_GREEN if self._cam_ok else config.COL_RED),
+            ('WRT', config.COL_GREEN if self._webrtc_ok else config.COL_YELLOW),
         ]
-        for c in colors:
+        for label, c in status_items:
             s = pygame.Surface((8, 8), pygame.SRCALPHA)
             pygame.draw.circle(s, (*c, 220), (4, 4), 3)
             pygame.draw.circle(s, (*c, 60), (4, 4), 4)
             self._scr.blit(s, (x, cy - 4))
-            x += 12
-
-        x += 4
+            x += 10
+            lbl = F(7).render(label, True, (*c, 160))
+            self._scr.blit(lbl, (x, cy - 4))
+            x += 14
 
         # Lock indicator
         lock_label = 'LOCKED' if self._door_locked else 'OPEN'
@@ -636,63 +917,11 @@ class Display:
         rec_a = 255 if int(self._t*2) % 2 == 0 else 50
         pygame.draw.circle(self._scr, (*config.COL_RED, rec_a),
                             (cam_x+10, cam_y+10), 5)
-        r = F(9).render('REC', True, config.COL_RED)
+        r = F(9).render('REC' if not self._webrtc_ok else 'LIVE', True, config.COL_RED)
         self._scr.blit(r, (cam_x+18, cam_y+6))
 
-        # ── Glowing face boxes ────────────────────────────────────────────
-        if surf and boxes:
-            sw, sh = surf.get_size()
-            scale = min(cam_w / max(sw, 1), cam_h / max(sh, 1))
-            nw, nh = int(sw * scale), int(sh * scale)
-            ox = cam_x + (cam_w - nw) // 2
-            oy = cam_y + (cam_h - nh) // 2
-
-            # Box colour by state
-            state = self._state
-            if state == self.GRANTED:
-                fc = config.COL_GREEN
-            elif state == self.DENIED:
-                fc = config.COL_RED
-            elif state in (self.NEW_FACE, self.WAITING, self.MESSAGE):
-                fc = config.COL_YELLOW
-            else:
-                fc = config.COL_CYAN
-
-            ga = self._pulse(4)
-
-            for box in boxes:
-                bx = int(ox + box[0] * scale)
-                by = int(oy + box[1] * scale)
-                bw = int(box[2] * scale)
-                bh = int(box[3] * scale)
-                conf = box[4] if len(box) > 4 else 0
-
-                # Multi-layer glow
-                for spread, base_alpha in [(10,15),(7,25),(4,50),(2,90),(1,150)]:
-                    gs = pygame.Surface((bw+spread*2, bh+spread*2), pygame.SRCALPHA)
-                    alpha = int(base_alpha * ga / 255)
-                    pygame.draw.rect(gs, (*fc, alpha),
-                                     (0, 0, bw+spread*2, bh+spread*2), 1)
-                    self._scr.blit(gs, (bx-spread, by-spread))
-
-                # Solid box
-                pygame.draw.rect(self._scr, fc, (bx, by, bw, bh), 2)
-
-                # Corner ticks
-                TL = 14; TT = 3
-                for (tx,ty,tsx,tsy) in [
-                    (bx,      by,       1,  1),
-                    (bx+bw-TL,by,      -1,  1),
-                    (bx,      by+bh-TL, 1, -1),
-                    (bx+bw-TL,by+bh-TL,-1, -1),
-                ]:
-                    pygame.draw.line(self._scr, fc,(tx,ty),(tx+TL*tsx,ty),TT)
-                    pygame.draw.line(self._scr, fc,(tx,ty),(tx,ty+TL*tsy),TT)
-
-                # Confidence label above box
-                if conf > 0:
-                    cl = F(10).render(f'{conf:.0f}%', True, fc)
-                    self._scr.blit(cl, (bx, by-14))
+        # Cyber data overlays
+        self._draw_cyber_overlay(cam_x, cam_y, cam_w, cam_h)
 
     # ── Panel helpers ─────────────────────────────────────────────────────
 
@@ -702,23 +931,41 @@ class Display:
                 self._panel_w, self._panel_h)
 
     def _panel_base(self, border_col, bg_alpha=12):
-        """Draw base background for bottom panel."""
+        """Draw neon cyberpunk base background for bottom panel."""
         px, py, pw, ph = self._panel_rect()
         bg = pygame.Surface((pw, ph), pygame.SRCALPHA)
         bg.fill((*border_col, bg_alpha))
         self._scr.blit(bg, (px, py))
+
+        # Neon glow border
+        for spread, a in [(6, 10), (3, 25), (1, 60)]:
+            gs = pygame.Surface((pw + spread * 2, ph + spread * 2), pygame.SRCALPHA)
+            pygame.draw.rect(gs, (*border_col, a),
+                              (spread, spread, pw, ph), 1)
+            self._scr.blit(gs, (px - spread, py - spread))
+
         pygame.draw.rect(self._scr, border_col, (px, py, pw, ph), 1)
-        # Corner brackets on panel too
-        L = 14; T = 2
+
+        # Corner brackets (cyberpunk style)
+        L = 20; T = 2
         for (cx2,cy2,sx,sy) in [
             (px,    py,    1, 1),(px+pw-L,py,   -1, 1),
             (px,    py+ph-L,1,-1),(px+pw-L,py+ph-L,-1,-1),
         ]:
             pygame.draw.line(self._scr, border_col,(cx2,cy2),(cx2+L*sx,cy2),T)
             pygame.draw.line(self._scr, border_col,(cx2,cy2),(cx2,cy2+L*sy),T)
-        # Branding watermark
+            # Extra glow tick
+            pygame.draw.line(self._scr, (*border_col, 60),
+                              (cx2-sx,cy2-sy),(cx2+L*sx,cy2-sy), T+2)
+
+        # Branding watermark with glitch effect
         bm = F(8, True).render('SECURA-9', True, (*border_col, 30))
         self._scr.blit(bm, (px + pw - bm.get_width() - 8, py + 4))
+        # Neon pulse line at top of panel
+        p = self._pulse01(1.5)
+        glow_col = tuple(int(c * (0.3 + 0.7 * p)) for c in border_col)
+        self._draw_cyber_divider(px + 4, py, pw - 8, glow_col)
+
         return px, py, pw, ph
 
     def _cx(self):
@@ -794,57 +1041,196 @@ class Display:
                                  rect.centery - ts.get_height() // 2))
 
     # ═══════════════════════════════════════════════════════════════════════
+    # FULL-SCREEN BOOT ANIMATION
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _draw_boot_animation(self):
+        t = self._elapsed()
+        cx = self._w // 2
+
+        # Phase 1: Power-on flash (t=0.0-0.15)
+        if t < 0.15:
+            flash = int(255 * (1 - t / 0.15))
+            self._scr.fill((flash, flash, max(0, flash - 50)))
+            return
+
+        # Phase 2: Logo with glitchy reveal (t=0.15-2.0)
+        logo_alpha = min(1.0, (t - 0.15) / 0.6)
+        logo_y = self._h // 3
+
+        if t < 2.0 and random.random() < 0.12:
+            off = random.randint(-12, 12)
+            for ch_off, col in [(off, (255, 0, 0)), (-off - 2, (0, 0, 255))]:
+                g = F(72).render('SECURA-9', True, col)
+                g.set_alpha(int(80 * logo_alpha))
+                self._scr.blit(g, (cx - g.get_width() // 2 + ch_off, logo_y))
+            sl_h = random.randint(4, 16)
+            sl_y = logo_y + random.randint(0, 80)
+            if sl_y + sl_h < self._h:
+                try:
+                    sr = pygame.Rect(0, sl_y, self._w, sl_h)
+                    sub = self._scr.subsurface(sr).copy()
+                    self._scr.blit(sub, (random.randint(-8, 8), sl_y))
+                except ValueError:
+                    pass
+
+        s = F(72).render('SECURA-9', True, config.COL_CYAN)
+        s.set_alpha(int(255 * logo_alpha))
+        self._scr.blit(s, (cx - s.get_width() // 2, logo_y))
+
+        if t > 0.6:
+            sub_a = min(1.0, (t - 0.6) / 0.5)
+            ss = F(13).render('BIOMETRIC ACCESS CONTROL SYSTEM', True, config.COL_MUTED)
+            ss.set_alpha(int(180 * sub_a))
+            self._scr.blit(ss, (cx - ss.get_width() // 2, logo_y + 85))
+
+        if t > 0.8:
+            ul_p = min(1.0, (t - 0.8) / 0.8)
+            ul_w = int(300 * ul_p)
+            ul = pygame.Surface((ul_w, 1), pygame.SRCALPHA)
+            for i in range(ul_w):
+                a = int(200 * (1 - i / ul_w))
+                ul.set_at((i, 0), (*config.COL_CYAN, a))
+            self._scr.blit(ul, (cx - ul_w // 2, logo_y + 95))
+
+        # Phase 3: POST lines (t=1.5-3.8)
+        if t > 1.5:
+            post = [
+                ('INITIALIZING HARDWARE',     1.5),
+                ('LOADING RECOGNITION MODULE', 1.9),
+                ('CAMERA SUBSYSTEM',           2.3),
+                ('CONFIGURING SECURE LINK',    2.7),
+                ('AUDIO SUBSYSTEM',            3.1),
+                ('WEBRTC STREAMING',           3.5),
+            ]
+            sy = self._h // 2 + 10
+            for i, (label, appear) in enumerate(post):
+                if t > appear:
+                    y = sy + i * 24
+                    prog = min(1.0, (t - appear) / 1.5)
+                    pct = int(prog * 100)
+                    if prog >= 1.0:
+                        tag, tc = '[OK]', config.COL_GREEN
+                    elif prog > 0.4:
+                        tag, tc = '[_]', config.COL_CYAN
+                    else:
+                        tag, tc = '[ ]', config.COL_YELLOW
+                    self._tl(f'{tag} {label}', 12, tc, 50, y)
+                    bw, bx = 80, self._w - 60 - 80
+                    pygame.draw.rect(self._scr, (30, 20, 50), (bx, y - 3, bw, 6), 0, 2)
+                    filled = int(bw * prog)
+                    if filled > 0:
+                        bc = config.COL_GREEN if prog >= 1.0 else config.COL_CYAN
+                        pygame.draw.rect(self._scr, bc, (bx, y - 3, filled, 6), 0, 2)
+                    self._tr(f'{pct}%', 10, config.COL_MUTED, bx - 6, y)
+
+        # Phase 4: Spinning rings (t=3.0-4.5)
+        if 3.0 < t < 4.5:
+            rc = self._w // 2
+            ry = logo_y + 45
+            draw_ring(self._scr, rc, ry, 60, config.COL_PURPLE,
+                      self._t, speed=1.2, gap=90, thick=1, alpha=100)
+            draw_ring(self._scr, rc, ry, 42, config.COL_CYAN,
+                      self._t, speed=-1.8, gap=70, thick=1, alpha=80)
+            draw_ring(self._scr, rc, ry, 24, config.COL_GREEN,
+                      self._t, speed=2.5, gap=50, thick=1, alpha=60)
+
+        # Phase 5: SYSTEM READY (t=4.5+)
+        if t > 4.5:
+            pulse = self._pulse01(2.0)
+            ry = self._h * 3 // 4 + 20
+            for i in range(4):
+                gw, gh = int(320 + i * 20), int(50 + i * 10)
+                glow = pygame.Surface((gw, gh), pygame.SRCALPHA)
+                ga = int(40 * (1 - i * 0.2) * pulse)
+                pygame.draw.rect(glow, (*config.COL_GREEN, ga), glow.get_rect(), int(4 - i), 6)
+                self._scr.blit(glow, (cx - gw // 2, ry - gh // 2))
+            sr = F(32).render('SYSTEM READY', True, config.COL_GREEN)
+            sr.set_alpha(int(220 + 35 * pulse))
+            self._scr.blit(sr, (cx - sr.get_width() // 2, ry - sr.get_height() // 2))
+
+        if t > 5.5:
+            self._set(self.IDLE)
+
+    # ═══════════════════════════════════════════════════════════════════════
     # PANELS
     # ═══════════════════════════════════════════════════════════════════════
 
     def _panel_boot(self):
-        px, py, pw, ph = self._panel_base(config.COL_CYAN, 8)
+        px, py, pw, ph = self._panel_base(config.COL_CYAN, 10)
         cx = self._panel_cx()
+        cy = py + ph // 2
 
-        # Rings inside panel
-        ring_cy = py + ph//2
-        draw_ring(self._scr, cx, ring_cy, 55, config.COL_CYAN,
-                  self._t, speed=1.0, gap=80, thick=1, alpha=120)
-        draw_ring(self._scr, cx, ring_cy, 38, config.COL_GREEN,
-                  self._t, speed=-1.6, gap=60, thick=1, alpha=90)
+        # Hacker-style rings
+        draw_ring(self._scr, cx, cy, 60, config.COL_PURPLE,
+                  self._t, speed=1.2, gap=90, thick=1, alpha=100)
+        draw_ring(self._scr, cx, cy, 42, config.COL_CYAN,
+                  self._t, speed=-1.8, gap=70, thick=1, alpha=80)
+        draw_ring(self._scr, cx, cy, 24, config.COL_GREEN,
+                  self._t, speed=2.5, gap=50, thick=1, alpha=60)
 
         t = self._elapsed()
         lines = [
-            ('▸ LOADING FACE DATABASE', config.COL_MUTED,  0.0),
-            ('▸ CONNECTING TO SERVER',  config.COL_MUTED,  0.5),
-            ('▸ CAMERA ONLINE',         config.COL_MUTED,  1.0),
-            ('▸ SYSTEM READY',          config.COL_GREEN,  1.5),
+            ('> LOADING FACE DATABASE',  config.COL_MUTED,  0.0),
+            ('> CONNECTING TO SERVER',   config.COL_MUTED,  0.5),
+            ('> CAMERA ONLINE',          config.COL_MUTED,  1.0),
+            ('> OBJECT DETECTION INIT',  config.COL_MUTED,  1.2),
+            ('> RECORDER READY',         config.COL_MUTED,  1.4),
+            ('> SYSTEM READY',           config.COL_GREEN,  1.8),
         ]
-        start_y = py + 20
+        start_y = py + 16
         for ln, col, delay in lines:
             if t > delay:
-                self._tl(ln, 11, col, px+16, start_y)
-            start_y += 20
+                self._draw_cyber_text(f'> {"" if t - delay < 0.15 else " "}{ln}',
+                                     10, col, px + 12, start_y,
+                                     glitch=(col == config.COL_GREEN))
+            start_y += 18
+
+        # Scanning progress bar
+        bw = int(pw * 0.7)
+        bx = cx - bw // 2
+        by = py + ph - 30
+        progress = min(1.0, t / 2.2)
+        pygame.draw.rect(self._scr, config.COL_PANEL2, (bx, by, bw, 4), 0, 2)
+        filled = int(bw * progress)
+        if filled > 0:
+            pg = pygame.Surface((filled, 4), pygame.SRCALPHA)
+            for i in range(filled):
+                a = int(200 * (1 - i / filled))
+                pg.set_at((i, 0), (*config.COL_CYAN, a))
+                pg.set_at((i, 1), (*config.COL_CYAN, a // 2))
+                pg.set_at((i, 2), (*config.COL_CYAN, a // 3))
+                pg.set_at((i, 3), (*config.COL_CYAN, a // 4))
+            self._scr.blit(pg, (bx, by))
+        self._tl(f'{int(progress * 100)}%', 9, config.COL_MUTED, bx + bw + 6, by + 2)
 
     # ──────────────────────────────────────────────────────────────────────
 
     def _panel_idle(self):
-        """
-        'Finding / Waiting for face...'  — matches sketch exactly.
-        Shows when no face is detected.
-        """
         px, py, pw, ph = self._panel_base(config.COL_CYAN, 6)
         cx = self._panel_cx()
         mid_y = py + ph//2
 
-        # Subtle rotating ring in background
-        draw_ring(self._scr, cx, mid_y, pw//2 - 20, config.COL_CYAN,
-                  self._t, speed=0.3, gap=200, thick=1, alpha=25)
+        # Pulsing beacon ring
+        pr = int(30 + 20 * self._pulse01(0.8))
+        draw_ring(self._scr, cx, mid_y, pr, config.COL_CYAN,
+                  self._t, speed=0.5, gap=120, thick=1, alpha=40)
 
         # Main status text — pulsing
         p = self._pulse01(1.5)
         col = tuple(int(c * (0.6 + 0.4*p)) for c in config.COL_CYAN)
 
-        self._tc('WAITING FOR FACE...',     20, col,              cx, mid_y-28, bold=True)
-        self._tc('Scanning entrance...',    13, config.COL_MUTED, cx, mid_y+4)
+        # Cyberpunk "scanning" animation text
+        scan_dots = '.' * (int(self._t * 2) % 4)
+        self._tc(f'SCANNING{scan_dots}',   22, col,              cx, mid_y-30, bold=True)
+        self._tc('MONITORING PERIMETER',   11, config.COL_MUTED, cx, mid_y-2)
 
         # Bengali
-        self._bnc('মুখের জন্য অপেক্ষা করছি', 16, config.COL_MUTED, cx, mid_y+30)
+        self._bnc('মুখের জন্য অপেক্ষা করছি', 15, config.COL_MUTED, cx, mid_y+24)
+
+        # Hex data stream
+        hex_str = ' '.join(random.choice('0123456789ABCDEF') for _ in range(24))
+        self._tc(hex_str, 8, (*config.COL_CYAN, 60), cx, mid_y+48)
 
         # Waveform at bottom of panel
         draw_waveform(self._scr, px+8, py+ph-28, pw-16, 22,
@@ -853,7 +1239,6 @@ class Display:
         # Known faces count bottom-right
         self._tr(f'DB: {self.known_face_count} FACES', 9,
                   config.COL_MUTED, px+pw-8, py+ph-34)
-
     # ──────────────────────────────────────────────────────────────────────
 
     def _panel_new_face(self):
@@ -917,7 +1302,7 @@ class Display:
     # ──────────────────────────────────────────────────────────────────────
 
     def _panel_granted(self):
-        """ACCESS GRANTED — green, animated."""
+        """ACCESS GRANTED — green neon cyberpunk."""
         px, py, pw, ph = self._panel_base(config.COL_GREEN, 18)
         cx = self._panel_cx()
         mid_y = py + ph//2
@@ -928,11 +1313,12 @@ class Display:
         ov.fill((*config.COL_GREEN, int(10 + 8*p)))
         self._scr.blit(ov, (px, py))
 
-        # Checkmark circle
+        # Checkmark circle with neon glow
         check_cy = py + 48
         r_ch = 32
-        draw_ring(self._scr, cx, check_cy, r_ch+8, config.COL_GREEN,
-                  self._t, speed=1.5, gap=30, thick=1, alpha=100)
+        for r, a in [(r_ch+16, 15), (r_ch+8, 30), (r_ch+4, 50)]:
+            draw_ring(self._scr, cx, check_cy, r, config.COL_GREEN,
+                      self._t, speed=0.5, gap=30, thick=1, alpha=a)
         pygame.draw.circle(self._scr, config.COL_DIM, (cx, check_cy), r_ch)
         pygame.draw.circle(self._scr, config.COL_GREEN, (cx, check_cy), r_ch, 2)
         pts = [(cx-16, check_cy+2), (cx-4, check_cy+14), (cx+18, check_cy-12)]
@@ -940,35 +1326,55 @@ class Display:
 
         self._tc('ACCESS GRANTED',    22, config.COL_GREEN, cx, py+100, bold=True)
         self._tc('WELCOME',           14, config.COL_TEXT,  cx, py+126)
-        self._tc(self._person_name,   24, config.COL_GREEN, cx, py+152, bold=True)
+        self._glitch_text(self._person_name, 24, config.COL_GREEN, cx, py+152)
 
         if self._confidence > 0:
             self._tc(f'{self._confidence:.0f}% match', 11,
                       config.COL_MUTED, cx, py+176)
 
-        self._tc('DOOR UNLOCKING...', 13, config.COL_GREEN, cx, py+200)
+        # Hacker-style unlock animation
+        unlock_text = 'DOOR: UNLOCKED' if int(self._t * 4) % 2 == 0 else 'DOOR: OPEN'
+        self._tc(unlock_text, 13, config.COL_GREEN, cx, py+200)
         self._bnc('স্বাগতম — প্রবেশ অনুমোদিত', 16, config.COL_TEXT, cx, py+222)
+
+        # Cyberpunk success line
+        self._draw_cyber_divider(px + 20, py + ph - 34, pw - 40, config.COL_GREEN)
 
         draw_waveform(self._scr, px+8, py+ph-28, pw-16, 22,
                       config.COL_GREEN, self._t, bars=36, active=True)
 
+    def _glitch_text(self, text, size, col, cx, cy):
+        if random.random() < 0.15:
+            for off, c in [(random.randint(-3, 3), config.COL_RED),
+                           (random.randint(-3, 3), config.COL_CYAN)]:
+                try:
+                    s = F(size, True).render(str(text), True, c)
+                    s.set_alpha(120)
+                    self._scr.blit(s, (cx - s.get_width()//2 + off, cy - s.get_height()//2))
+                except Exception: pass
+        try:
+            s = F(size, True).render(str(text), True, col)
+            self._scr.blit(s, (cx - s.get_width()//2, cy - s.get_height()//2))
+        except Exception: pass
+
     # ──────────────────────────────────────────────────────────────────────
 
     def _panel_denied(self):
-        """ACCESS DENIED — red."""
-        px, py, pw, ph = self._panel_base(config.COL_RED, 18)
+        """ACCESS DENIED — red neon cyberpunk."""
+        px, py, pw, ph = self._panel_base(config.COL_RED, 20)
         cx = self._panel_cx()
 
         p = self._pulse01(3)
         ov = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        ov.fill((*config.COL_RED, int(8 + 8*p)))
+        ov.fill((*config.COL_RED, int(10 + 8*p)))
         self._scr.blit(ov, (px, py))
 
-        # X circle
+        # X circle with alarm glow
         xc_cy = py + 50
         r_x = 30
-        draw_ring(self._scr, cx, xc_cy, r_x+8, config.COL_RED,
-                  self._t, speed=-2.0, gap=30, thick=1, alpha=100)
+        for r, a in [(r_x+16, 15), (r_x+8, 30)]:
+            draw_ring(self._scr, cx, xc_cy, r, config.COL_RED,
+                      self._t, speed=-1.0, gap=20, thick=1, alpha=a)
         pygame.draw.circle(self._scr, config.COL_DIM, (cx, xc_cy), r_x)
         pygame.draw.circle(self._scr, config.COL_RED, (cx, xc_cy), r_x, 2)
         pygame.draw.line(self._scr, config.COL_RED,
@@ -976,10 +1382,16 @@ class Display:
         pygame.draw.line(self._scr, config.COL_RED,
                           (cx+16, xc_cy-16), (cx-16, xc_cy+16), 4)
 
-        self._tc('ACCESS DENIED',       22, config.COL_RED,   cx, py+98, bold=True)
-        self._tc('UNAUTHORIZED ENTRY',  13, config.COL_TEXT,  cx, py+124)
-        self._tc('DOOR STAYS LOCKED',   13, config.COL_RED,   cx, py+148)
-        self._bnc('প্রবেশ অস্বীকৃত হয়েছে', 16, config.COL_TEXT, cx, py+174)
+        # Alarm flash
+        if int(self._t * 2) % 2 == 0:
+            self._tc('⚠  INTRUSION ALERT  ⚠', 14, config.COL_YELLOW, cx, py+98)
+
+        self._tc('ACCESS DENIED',       22, config.COL_RED,   cx, py+118, bold=True)
+        self._tc('UNAUTHORIZED ENTRY',  13, config.COL_TEXT,  cx, py+142)
+        self._tc('DOOR STAYS LOCKED',   13, config.COL_RED,   cx, py+162)
+        self._bnc('প্রবেশ অস্বীকৃত হয়েছে', 16, config.COL_TEXT, cx, py+184)
+
+        self._draw_cyber_divider(px + 20, py + ph - 34, pw - 40, config.COL_RED)
 
         draw_waveform(self._scr, px+8, py+ph-28, pw-16, 22,
                       config.COL_RED, self._t, bars=36, active=True)
@@ -987,20 +1399,29 @@ class Display:
     # ──────────────────────────────────────────────────────────────────────
 
     def _panel_nobody_home(self):
-        """Nobody home — red warning."""
-        px, py, pw, ph = self._panel_base(config.COL_RED, 14)
+        """Nobody home — red cyberpunk warning."""
+        px, py, pw, ph = self._panel_base(config.COL_RED, 16)
         cx = self._panel_cx()
         mid_y = py + ph//2
 
         p = self._pulse01(2)
-        rc = (min(255, int(80 + 175*p)), 0, 20)
+        rc = (min(255, int(80 + 175*p)), 0, 40)
 
-        self._tc('⚠  NOBODY HOME  ⚠',      20, rc,                cx, py+22, bold=True)
-        self._bnc('কেউ বাড়িতে নেই',          18, config.COL_YELLOW, cx, mid_y-10)
-        self._bnc('পরে আসুন',               16, config.COL_TEXT,   cx, mid_y+18)
+        # Alert rings
+        draw_ring(self._scr, cx, mid_y-10, int(40 + 10 * p), config.COL_RED,
+                  self._t, speed=1.5, gap=30, thick=1, alpha=80)
+        draw_ring(self._scr, cx, mid_y-10, int(25 + 8 * p), config.COL_YELLOW,
+                  self._t, speed=-2.0, gap=60, thick=2, alpha=int(60 + 60*p))
 
-        draw_ring(self._scr, cx, mid_y+44, 28, config.COL_RED,
-                  self._t, speed=2, gap=50, thick=1, alpha=120)
+        # Scanning text
+        self._tc('⚠  NOBODY HOME ⚠',      22, rc,                cx, py+22, bold=True)
+        self._tc('SECURE MODE ACTIVE',     10, config.COL_YELLOW, cx, py+48)
+        self._bnc('কেউ বাড়িতে নেই',       16, config.COL_YELLOW, cx, mid_y+10)
+        self._bnc('পরে আসুন',             14, config.COL_TEXT,   cx, mid_y+34)
+
+        # Status info
+        self._tl('OTP: ENABLED  MONITOR: ACTIVE', 8, (*config.COL_GREEN, 100),
+                  px + 10, py + ph - 20)
 
         draw_waveform(self._scr, px+8, py+ph-28, pw-16, 22,
                       config.COL_RED, self._t, bars=36, active=True)
@@ -1050,8 +1471,8 @@ class Display:
         self._tc('🔐  OTP GENERATED', 18, config.COL_CYAN, cx, py+18, bold=True)
         self._tc('CHECK YOUR PHONE',  11, config.COL_MUTED, cx, py+42)
 
-        # Show OTP big
-        self._tc(self._otp_display, 42, config.COL_GREEN, cx, mid_y-18, bold=True)
+        # OTP is NOT shown on screen — sent via notification only
+        self._tc('••••••', 42, config.COL_GREEN, cx, mid_y - 18, bold=True)
 
         remaining = max(0, int(self._otp_expiry - self._elapsed()))
         self._tc(f'Expires in {remaining}s', 13, config.COL_YELLOW, cx, mid_y+18)
@@ -1133,8 +1554,58 @@ class Display:
         cx = self._panel_cx()
         mid_y = py + ph // 2
 
-        self._tc('⏱  OTP EXPIRED', 20, config.COL_RED, cx, mid_y-14, bold=True)
+        self._tc('OTP EXPIRED', 20, config.COL_RED, cx, mid_y-14, bold=True)
         self._tc('Please request a new code', 13, config.COL_TEXT, cx, mid_y+16)
 
         draw_waveform(self._scr, px+8, py+ph-28, pw-16, 22,
                       config.COL_RED, self._t, bars=36, active=True)
+
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _panel_passage(self):
+        px, py, pw, ph = self._panel_base(config.COL_GREEN, 10)
+        cx = self._panel_cx()
+        mid_y = py + ph // 2
+        self._tc('🚪 PASSAGE MODE', 22, config.COL_GREEN, cx, mid_y - 20, bold=True)
+        self._tc('Door stays unlocked', 14, config.COL_WHITE, cx, mid_y + 14)
+        self._tc('Disable from app or hold button', 11, config.COL_MUTED, cx, mid_y + 38)
+
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _panel_dual_auth(self):
+        px, py, pw, ph = self._panel_base(config.COL_CYAN, 10)
+        cx = self._panel_cx()
+        mid_y = py + ph // 2
+        self._tc('🔐 DUAL AUTH', 18, config.COL_CYAN, cx, py+16, bold=True)
+        self._tc(f'Face matched: {self._dual_auth_name}', 12, config.COL_GREEN, cx, py+44)
+        self._tc('Now enter OTP to unlock', 13, config.COL_TEXT, cx, mid_y-10)
+        self._tc('Enter 6-digit code below', 12, config.COL_MUTED, cx, mid_y+18)
+
+        boxes_y = mid_y + 50
+        box_w, box_h, gap = 36, 44, 6
+        total = 6 * box_w + 5 * gap
+        x0 = cx - total // 2
+        for i in range(6):
+            bx = x0 + i * (box_w + gap)
+            filled = i < len(self._otp_digits)
+            col = config.COL_GREEN if filled else config.COL_MUTED
+            pygame.draw.rect(self._scr, config.COL_PANEL2, (bx, boxes_y, box_w, box_h), 0, 4)
+            pygame.draw.rect(self._scr, col, (bx, boxes_y, box_w, box_h), 1, 4)
+            if i < len(self._otp_digits):
+                self._tc(self._otp_digits[i], 24, config.COL_GREEN, bx + box_w // 2, boxes_y + box_h // 2 - 4, bold=True)
+
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _panel_alarm(self):
+        px, py, pw, ph = self._panel_base(config.COL_RED, 14)
+        cx = self._panel_cx()
+        mid_y = py + ph // 2
+
+        pulsing = config.COL_RED if int(self._t * 3) % 2 == 0 else (180, 0, 60)
+        self._tc('🚨  TAMPER ALARM', 24, pulsing, cx, mid_y - 30, bold=True)
+        self._tc('INTRUSION DETECTED', 16, config.COL_RED, cx, mid_y + 6, bold=True)
+        self._tc('Authorities notified', 12, config.COL_MUTED, cx, mid_y + 36)
+
+        poly = [(cx - 40, mid_y - 80), (cx, mid_y - 120), (cx + 40, mid_y - 80)]
+        pygame.draw.polygon(self._scr, pulsing, poly)
+        pygame.draw.circle(self._scr, pulsing, (cx, mid_y - 68), 6)
